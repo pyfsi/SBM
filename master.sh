@@ -28,20 +28,20 @@ export CFD_MODULE=$CFD_PROGRAMME/$CFD_VERSION
 if [ "$CFD_PROGRAMME" = "OpenFOAM" ]
 then
 	# Read the inlet geometry : This script is designed to be case-dependent
-	python TubeBundle_readInlet_$CFD_PROGRAMME.py $DIM $CASE_PATH $CFD_MODULE $startTime $inletName
+	python readInlet_$CFD_PROGRAMME.py $DIM $CASE_PATH $CFD_MODULE $startTime $inletName
 else
 	echo "The CFD-programme you have tried to use is not defined in the main script."
 	exit 1
 fi
 
 # Model the inlet : This script is designed to be case-independent
-python TubeBundle_inletModelling.py $CASE_PATH $startTime $endTime $timeStepSize $tunit $inletName $rhog $rhol $mg $tol_mg $U $intersectBoundary $intersectBubble
+python inletModelling.py $CASE_PATH $startTime $endTime $timeStepSize $tunit $inletName $rhog $rhol $mg $tol_mg $U $intersectBoundary $intersectBubble
 
 # The modelled inlet has to be written in a format compatible with the flow solver that is to be used
 if [ "$CFD_PROGRAMME" = "OpenFOAM" ]
 then
         # Write the inlet boundary condition with Python-script
-	python TubeBundle_writeBC_$CFD_PROGRAMME.py $CASE_PATH $startTime $inletName
+	python writeBC_$CFD_PROGRAMME.py $CASE_PATH $startTime $inletName
 else
         echo "The CFD-programme you have tried to use is not defined in the main script."
         exit 1
