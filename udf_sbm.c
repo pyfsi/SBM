@@ -109,8 +109,8 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
 
     int thread, n_faces, i_f, d, compute_node;
     DECLARE_MEMORY_N(face_coords, real, ND_ND);
-    DECLARE_MEMORY_N(face_ids, int, mnpf);
 	DECLARE_MEMORY_N(face_areas, real, ND_ND);
+    DECLARE_MEMORY_N(face_ids, int, mnpf);
 
 #if !RP_HOST
     Domain *domain;
@@ -156,7 +156,7 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
         begin_f_loop(face, face_thread) {
             if (i_f >= n_faces) {Error("\nIndex %i >= array size %i.", i_f, n_faces);}
 
-            F_CENTROID(centroid, face, face_thread);
+            F_CENTROID(centroid, face, face_thread); /*centroid of face returned from F_CENTROID */
 			F_AREA(area,face,face_thread); /* face normal vector returned from F_AREA */
 
             for (d = 0; d < ND_ND; d++) {
@@ -235,6 +235,8 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
             for (i_f = 0; i_f < n_faces; i_f++) {
                 for (d = 0; d < ND_ND; d++) {
                     fprintf(file_faces, "%27.17e ", face_coords[d][i_f]);
+				}
+                for (d = 0; d < ND_ND; d++) {
                     fprintf(file_faces, "%27.17e ", face_areas[d][i_f]);
                 }
                 for (d = 0; d < mnpf; d++) {
