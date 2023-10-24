@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <stdbool.h>
 
 /* dynamic memory allocation for 1D and 2D arrays */
 #define DECLARE_MEMORY(name, type) type *name = NULL
@@ -64,14 +65,17 @@ for (_d = 0; _d < dim; _d++) {                                      \
 #define n_slices 20000
 int _d; /* don't use in UDFs! */
 int n_threads;
+int n_faces;
 DECLARE_MEMORY(thread_ids, int);
+DECLARE_MEMORY_N(ids, int, mnpf);
+DECLARE_MEMORY_N(vof_w, int, n_slices);
 int iteration = 0;
 int timestep = 0;
 
 
-  /*----------------*/
+  /*----------------------*/
  /* get_inlet_thread_ids */
-/*----------------*/
+/*----------------------*/
 
 DEFINE_ON_DEMAND(get_inlet_thread_ids) {
     /* read in thread thread ids, should be called early on */
@@ -264,3 +268,143 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
     if (myid == 0) {printf("\nFinished UDF store_faces_normals_id.\n"); fflush(stdout);}
 }
 
+  /*-------------------*/
+ /* read_vof_face_ids */
+/*-------------------*/
+
+DEFINE_ON_DEMAND(read_vof_face_ids) {
+
+#if RP_NODE
+int compute_node;
+#endif /*RP_NODE*/
+
+#if !RP_NODE
+    int i, j;
+    char file_ids[] = "face_ids.dat";
+    char file_vof[] = "inlet_VOFw.dat";
+    FILE *fp_ids;
+    FILE *fp_vof;
+
+    if (NULLP(fp_ids = fopen(file_ids, "r"))) {
+        Error("\nUDF-error: Unable to open %s for reading\n", file_ids);
+        exit(1);
+    }
+    fscanf(fp_ids, "# %i", &n_faces);
+
+    if (NULLP(fp_vof = fopen(file_vof, "r"))) {
+        Error("\nUDF-error: Unable to open %s for reading\n", file_vof);
+        exit(1);
+    }
+
+    ASSIGN_MEMORY_N(ids, n_faces, int, mnpf);
+    ASSIGN_MEMORY_N(vof_w, n_faces, int, n_slices);
+
+    for (i=0; i<n_faces; i++){
+        for (j=0; j<mnpf; j++){
+            fscanf(fp_ids, "%i", &ids[j][i]);
+            printf("%i ", ids[j][i]);
+        }
+        printf("\n");
+        for (j=0; j<n_slices; j++){
+            fscanf(fp_vof, "%i", &vof_w[j][i]);
+        }
+    }
+    fclose(fp_ids);
+    fclose(fp_vof);
+
+#endif /*!RP_NODE*/
+
+    /* Send data to nodes */
+    host_to_node_int_1(n_faces);
+
+#if RP_HOST
+    PRF_CSEND_INT_N(node_zero, ids, n_faces, myid, mnpf); /* send from host to node0 */
+    PRF_CSEND_INT_N(node_zero, vof_w, n_faces, myid, mnpf); /* send from host to node0 */
+#endif /*RP_HOST*/
+
+#if RP_NODE
+    ASSIGN_MEMORY_N(ids, n_faces, int, mnpf);
+    ASSIGN_MEMORY_N(vof_w, n_faces, int, n_slices);
+
+    if(I_AM_NODE_ZERO_P){
+        PRF_CRECV_INT_N(node_host, ids, n_faces, node_host, mnpf);
+        PRF_CRECV_INT_N(node_host, vof_w, n_faces, node_host, mnpf);
+        compute_node_loop_not_zero(compute_node){
+        PRF_CSEND_INT_N(compute_node, ids, n_faces, myid, mnpf);
+        PRF_CSEND_INT_N(compute_node, vof_w, n_faces, myid, mnpf);
+        }
+    }
+    else {
+        PRF_CRECV_INT_N(node_zero, ids, n_faces, node_zero, mnpf);
+        PRF_CRECV_INT_N(node_zero, vof_w, n_faces, node_zero, mnpf);
+    }
+#endif /*RP_NODE*/
+
+    Message0("\nFinished UDF read_vof_faces_ids.\n");
+}
+
+DEFINE_ON_DEMAND(test){
+
+#if !RP_HOST
+    int i_f, i_n, j, thread, node_number;
+    int i_f_min = 0;
+    int match_counter =0 ;
+    int loop_counter = 0;
+    bool match_found, all_matched;
+    Domain *domain = Get_Domain(1);
+    Thread *face_thread;
+    face_t face;
+    Node *node;
+    real centroid[ND_ND];
+	real area[ND_ND];
+    real x[ND_ND]; /* this will hold the position vector */
+    int node_ids[mnpf];
+
+    for (thread=0; thread<n_threads; thread++) { /* not in udf_profile because there you get the thread*/
+        face_thread = Lookup_Thread(domain, thread_ids[thread]);
+        begin_f_loop(face,face_thread)
+        {
+            /* store node ids in array*/
+            for (i_n=0; i_n<mnpf; i_n++)
+                node_ids[i_n] = -1; /* if not all cells same number of nodes, fill with -1*/
+            i_n = 0;
+
+            f_node_loop(face, face_thread, node_number) {
+                node = F_NODE(face, face_thread, node_number);
+                node_ids[i_n++] = NODE_DM_ID(node); /* store ID and post-increment iterator*/
+                /* Message("Node ID: %i\n", node_ids[i_n-1]); */
+            }
+            /*compare ids to file to find correct line (assumed different order) */
+            for (i_f=i_f_min; i_f<n_faces; i_f++) {
+                loop_counter++;
+                all_matched = true;
+                i_n = 0;
+                while (all_matched && (i_n < mnpf)) {
+                    match_found = false;
+                    j = 0;
+                    while (!match_found && (j < mnpf)) {  /* compare them without assuming ordering */
+                        match_found = (ids[i_n][i_f] == node_ids[j++]); /* compare and post-increment j */
+                    }
+                    if (!match_found) {
+                        all_matched = false;
+                    }
+                    else {
+                    i_n++;
+                    }
+                }
+                if (all_matched) {
+                    match_counter++;
+                    break;  /* current i_f will be number in file */
+                }
+            }
+            if (i_f == i_f_min + 1) {
+                i_f_min++; /* for efficiency */
+            }
+            /* do SBM profile stuff */
+        }
+        end_f_loop(f,t)
+        Message("\nTotal matches: %i in a total of %i loop executions\n", match_counter, loop_counter);
+    }
+
+#endif /*!RP_HOST*/
+}
