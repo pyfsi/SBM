@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <prf.h>
 
 /* dynamic memory allocation for 1D and 2D arrays */
 #define DECLARE_MEMORY(name, type) type *name = NULL
@@ -62,16 +63,14 @@ for (_d = 0; _d < dim; _d++) {                                      \
 
 /* global variables */
 #define mnpf 4 /*max nodes per face hardcoded */
-#define n_slices 20000
+#define n_slices 20000 /* change! */
 int _d; /* don't use in UDFs! */
 int n_threads;
 int n_faces;
 DECLARE_MEMORY(thread_ids, int);
 DECLARE_MEMORY_N(ids, int, mnpf);
 DECLARE_MEMORY_N(vof_w, int, n_slices);
-int iteration = 0;
-int timestep = 0;
-
+int timestep;
 
   /*----------------------*/
  /* get_inlet_thread_ids */
@@ -103,7 +102,6 @@ DEFINE_ON_DEMAND(get_inlet_thread_ids) {
     if (myid == 0) {printf("\nFinished UDF get_inlet_thread_ids.\n"); fflush(stdout);}
 
 }
-
 
   /*-------------------------*/
  /* store_faces_normals_ids */
@@ -159,7 +157,7 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
 
         i_f = 0;
         begin_f_loop(face, face_thread) {
-            if (i_f >= n_faces) {Error("\nIndex %i >= array size %i.", i_f, n_faces);}
+            if (i_f >= n_faces) {Error("\nUDF-error: Index %i >= array size %i.", i_f, n_faces);}
 
             F_CENTROID(centroid, face, face_thread); /*centroid of face returned from F_CENTROID */
 			F_AREA(area,face,face_thread); /* face normal vector returned from F_AREA */
@@ -177,7 +175,7 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
             f_node_loop(face, face_thread, node_number) {
                 node = F_NODE(face, face_thread, node_number);
 
-                if (j >= mnpf) {Error("\nIndex %i >= array size %i.", j, mnpf);}
+                if (j >= mnpf) {Error("\nUDF-error: Index %i >= array size %i.", j, mnpf);}
                 face_ids[j][i_f] = NODE_DM_ID(node);
                 j++;
             }
@@ -274,6 +272,8 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
 
 DEFINE_ON_DEMAND(read_vof_face_ids) {
 
+    if (myid == 0) {printf("\nStarted UDF read_vof_face_ids.\n"); fflush(stdout);}
+
 #if RP_NODE
 int compute_node;
 #endif /*RP_NODE*/
@@ -302,9 +302,7 @@ int compute_node;
     for (i=0; i<n_faces; i++){
         for (j=0; j<mnpf; j++){
             fscanf(fp_ids, "%i", &ids[j][i]);
-            printf("%i ", ids[j][i]);
         }
-        printf("\n");
         for (j=0; j<n_slices; j++){
             fscanf(fp_vof, "%i", &vof_w[j][i]);
         }
@@ -320,6 +318,7 @@ int compute_node;
 #if RP_HOST
     PRF_CSEND_INT_N(node_zero, ids, n_faces, myid, mnpf); /* send from host to node0 */
     PRF_CSEND_INT_N(node_zero, vof_w, n_faces, myid, mnpf); /* send from host to node0 */
+    /* should the memory be freed? */
 #endif /*RP_HOST*/
 
 #if RP_NODE
@@ -340,16 +339,13 @@ int compute_node;
     }
 #endif /*RP_NODE*/
 
-    Message0("\nFinished UDF read_vof_faces_ids.\n");
+    if (myid == 0) {printf("\nFinished UDF read_vof_face_ids.\n"); fflush(stdout);}
 }
 
 DEFINE_ON_DEMAND(test){
 
 #if !RP_HOST
-    int i_f, i_n, j, thread, node_number;
-    int i_f_min = 0;
-    int match_counter =0 ;
-    int loop_counter = 0;
+    int i_f, i_n, j, thread, node_number, i_f_min, match_counter, total_matches;
     bool match_found, all_matched;
     Domain *domain = Get_Domain(1);
     Thread *face_thread;
@@ -362,6 +358,8 @@ DEFINE_ON_DEMAND(test){
 
     for (thread=0; thread<n_threads; thread++) { /* not in udf_profile because there you get the thread*/
         face_thread = Lookup_Thread(domain, thread_ids[thread]);
+        i_f_min = 0;
+        match_counter = 0;
         begin_f_loop(face,face_thread)
         {
             /* store node ids in array*/
@@ -372,11 +370,9 @@ DEFINE_ON_DEMAND(test){
             f_node_loop(face, face_thread, node_number) {
                 node = F_NODE(face, face_thread, node_number);
                 node_ids[i_n++] = NODE_DM_ID(node); /* store ID and post-increment iterator*/
-                /* Message("Node ID: %i\n", node_ids[i_n-1]); */
             }
             /*compare ids to file to find correct line (assumed different order) */
             for (i_f=i_f_min; i_f<n_faces; i_f++) {
-                loop_counter++;
                 all_matched = true;
                 i_n = 0;
                 while (all_matched && (i_n < mnpf)) {
@@ -403,7 +399,10 @@ DEFINE_ON_DEMAND(test){
             /* do SBM profile stuff */
         }
         end_f_loop(f,t)
-        Message("\nTotal matches: %i in a total of %i loop executions\n", match_counter, loop_counter);
+        total_matches = PRF_GRSUM1(match_counter);
+        if (total_matches != n_faces) {
+            Error("UDF-error: total matches %i not equal to number of faces %i", total_matches, n_faces);
+        }
     }
 
 #endif /*!RP_HOST*/
