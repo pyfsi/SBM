@@ -61,6 +61,7 @@ for (_d = 0; _d < dim; _d++) {                                      \
 
 /* global variables */
 #define mnpf 4 /*max nodes per face hardcoded */
+#define n_slices 20000
 int _d; /* don't use in UDFs! */
 int n_threads;
 DECLARE_MEMORY(thread_ids, int);
@@ -107,7 +108,7 @@ DEFINE_ON_DEMAND(get_inlet_thread_ids) {
 DEFINE_ON_DEMAND(store_faces_normals_ids) {
     if (myid == 0) {printf("\n\nStarted UDF store_faces_normals_id.\n"); fflush(stdout);}
 
-    int thread, n_faces, i_f, d, compute_node;
+    int thread, i_f, d, compute_node;
     DECLARE_MEMORY_N(face_coords, real, ND_ND);
 	DECLARE_MEMORY_N(face_areas, real, ND_ND);
     DECLARE_MEMORY_N(face_ids, int, mnpf);

@@ -18,7 +18,7 @@ normal = np.load('normalInletPython.npy')
 
 n_faces = faces.shape[0]
 
-VOFw = np.ones((n_faces, n_slices))
+VOFw = np.ones((n_faces, n_slices, 1))
 
 midpoint = faces[:, 1:4].mean(axis=0)
 midpoint += normal*U*T/2
@@ -28,11 +28,11 @@ for i in range(n_faces):
         point = faces[i, 1:4] + normal*U*dt*j
         distance = np.linalg.norm(midpoint-point)
         if distance < R:
-            VOFw[i, j] = 0
+            VOFw[i, j, 0] = 0
 
 
 np.save('inletDefinition-VOFw.npy', VOFw)
 
 # plot slice  # todo: tomography plotter
 plt.figure()
-plt.scatter(faces[:, 1], faces[:, 2], VOFw[:, 10000])
+plt.scatter(faces[:, 1], faces[:, 2], VOFw[:, 10000, 0])
