@@ -59,6 +59,7 @@ coord_list = np.ones((faces_n, 5))  # initialize on 1
 coord_list[:, 0] = np.arange(faces_n)
 coord_list[:, 1:4] = faces[:, 0:3]
 coord_list[:, 4] = np.linalg.norm(faces[:, 3:6], axis=1)  # face areas
+face_ids = faces[:, 6:10]
 
 normal_inlets = faces[:, 3:6]/coord_list[:, 4].reshape(faces_n, 1)  # compute unit normals on each face
 tol = 1e-15
@@ -70,3 +71,4 @@ else:
 # Save inlet and normal in Python Numpy-array format
 np.save("inletPython.npy", coord_list)
 np.save("normalInletPython.npy", normal_inlet)
+np.save("face_ids.npy", face_ids)
