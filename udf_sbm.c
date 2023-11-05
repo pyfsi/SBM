@@ -72,6 +72,7 @@ DECLARE_MEMORY(thread_ids, int);
 DECLARE_MEMORY_N(ids, int, mnpf);
 DECLARE_MEMORY_N(vof_w, int, n_slices);
 int previous_time_step = time_step_start - 1;
+bool data_loaded = false;
 
   /*----------------------*/
  /* get_inlet_thread_ids */
@@ -341,6 +342,7 @@ int compute_node;
     }
 #endif /*RP_NODE*/
 
+    data_loaded = true;
     if (myid == 0) {printf("\nFinished UDF read_vof_face_ids.\n"); fflush(stdout);}
 }
 
@@ -354,7 +356,10 @@ DEFINE_PROFILE(sbm_profile, face_thread, alpha){
     int node_ids[mnpf];
     int time_step = N_TIME;
 
-    if (time_step == previous_time_step + 1){ /* only execute first call of time step */
+    if (time_step - previous_time_step > 1) {previous_time_step = time_step -1;} /* restart in same SBM data array */
+
+    if (time_step == previous_time_step + 1 && data_loaded){ /* only execute first call of time step */
+
         previous_time_step = time_step;
 
         begin_f_loop(face,face_thread)
@@ -404,4 +409,5 @@ DEFINE_PROFILE(sbm_profile, face_thread, alpha){
             Error("UDF-error: total matches %i not equal to number of faces %i", total_matches, n_faces);
         }
     }
+    else if (myid == 0 && !data_loaded) {printf("Warning: no data for the SBM was loaded!\n");}
 }
