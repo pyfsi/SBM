@@ -354,64 +354,54 @@ DEFINE_PROFILE(sbm_profile, face_thread, alpha){
     int node_ids[mnpf];
     int time_step = N_TIME;
 
-    if (Data_Valid_P()){
-        if (time_step == previous_time_step + 1){ /* only execute first call of time step */
-            previous_time_step = time_step;
+    if (time_step == previous_time_step + 1){ /* only execute first call of time step */
+        previous_time_step = time_step;
 
-            begin_f_loop(face,face_thread)
-            {
-                /* initialize node_ids array */
-                for (i_n=0; i_n<mnpf; i_n++)
-                    node_ids[i_n] = -1; /* if not all cells same number of nodes, fill with -1*/
-                i_n = 0;
-
-                /* store node ids in node_ids array*/
-                f_node_loop(face, face_thread, node_number) {
-                    node = F_NODE(face, face_thread, node_number);
-                    node_ids[i_n++] = NODE_DM_ID(node); /* store ID and post-increment iterator*/
-                }
-
-                /*compare ids to file to find correct line (assumed different order) */
-                for (i_f=i_f_min; i_f<n_faces; i_f++) {
-                    all_matched = true;
-                    i_n = 0;
-                    while (all_matched && (i_n < mnpf)) {
-                        match_found = false;
-                        j = 0;
-                        while (!match_found && (j < mnpf)) {  /* compare them without assuming ordering */
-                            match_found = (ids[i_n][i_f] == node_ids[j++]); /* compare and post-increment j */
-                        }
-                        if (!match_found) {
-                            all_matched = false;
-                        }
-                        else {
-                        i_n++;
-                        }
-                    }
-                    if (all_matched) {
-                        match_counter++;
-                        break;  /* current i_f will be number in file */
-                    }
-                }
-                if (i_f == i_f_min + 1) {
-                    i_f_min++; /* for efficiency */
-                }
-                /* apply SBM to VOF boundary profile */
-                F_PROFILE(face, face_thread, alpha) = vof_w[time_step-time_step_start][i_f];
-            }
-            end_f_loop(face,face_thread)
-            total_matches = PRF_GRSUM1(match_counter);
-            if (total_matches != n_faces) {
-                Error("UDF-error: total matches %i not equal to number of faces %i", total_matches, n_faces);
-            }
-        }
-    }
-    else {
-        if (myid==0) {printf("\nWarning: No SBM data array has been loaded, using 1 as value everywhere!\n");}
         begin_f_loop(face,face_thread)
-            {
-            F_PROFILE(face, face_thread, alpha) = 1;
+        {
+            /* initialize node_ids array */
+            for (i_n=0; i_n<mnpf; i_n++)
+                node_ids[i_n] = -1; /* if not all cells same number of nodes, fill with -1*/
+            i_n = 0;
+
+            /* store node ids in node_ids array*/
+            f_node_loop(face, face_thread, node_number) {
+                node = F_NODE(face, face_thread, node_number);
+                node_ids[i_n++] = NODE_DM_ID(node); /* store ID and post-increment iterator*/
             }
-            end_f_loop(face,face_thread)
+
+            /*compare ids to file to find correct line (assumed different order) */
+            for (i_f=i_f_min; i_f<n_faces; i_f++) {
+                all_matched = true;
+                i_n = 0;
+                while (all_matched && (i_n < mnpf)) {
+                    match_found = false;
+                    j = 0;
+                    while (!match_found && (j < mnpf)) {  /* compare them without assuming ordering */
+                        match_found = (ids[i_n][i_f] == node_ids[j++]); /* compare and post-increment j */
+                    }
+                    if (!match_found) {
+                        all_matched = false;
+                    }
+                    else {
+                    i_n++;
+                    }
+                }
+                if (all_matched) {
+                    match_counter++;
+                    break;  /* current i_f will be number in file */
+                }
+            }
+            if (i_f == i_f_min + 1) {
+                i_f_min++; /* for efficiency */
+            }
+            /* apply SBM to VOF boundary profile */
+            F_PROFILE(face, face_thread, alpha) = vof_w[time_step-time_step_start][i_f];
+        }
+        end_f_loop(face,face_thread)
+        total_matches = PRF_GRSUM1(match_counter);
+        if (total_matches != n_faces) {
+            Error("UDF-error: total matches %i not equal to number of faces %i", total_matches, n_faces);
+        }
     }
 }
