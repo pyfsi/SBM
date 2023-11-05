@@ -317,7 +317,7 @@ int compute_node;
 
 #if RP_HOST
     PRF_CSEND_INT_N(node_zero, ids, n_faces, myid, mnpf); /* send from host to node0 */
-    PRF_CSEND_INT_N(node_zero, vof_w, n_faces, myid, mnpf); /* send from host to node0 */
+    PRF_CSEND_INT_N(node_zero, vof_w, n_faces, myid, n_slices); /* send from host to node0 */
     /* should the memory be freed? */
 #endif /*RP_HOST*/
 
@@ -327,83 +327,80 @@ int compute_node;
 
     if(I_AM_NODE_ZERO_P){
         PRF_CRECV_INT_N(node_host, ids, n_faces, node_host, mnpf);
-        PRF_CRECV_INT_N(node_host, vof_w, n_faces, node_host, mnpf);
+        PRF_CRECV_INT_N(node_host, vof_w, n_faces, node_host, n_slices);
         compute_node_loop_not_zero(compute_node){
         PRF_CSEND_INT_N(compute_node, ids, n_faces, myid, mnpf);
-        PRF_CSEND_INT_N(compute_node, vof_w, n_faces, myid, mnpf);
+        PRF_CSEND_INT_N(compute_node, vof_w, n_faces, myid, n_slices);
         }
     }
     else {
         PRF_CRECV_INT_N(node_zero, ids, n_faces, node_zero, mnpf);
-        PRF_CRECV_INT_N(node_zero, vof_w, n_faces, node_zero, mnpf);
+        PRF_CRECV_INT_N(node_zero, vof_w, n_faces, node_zero, n_slices);
     }
 #endif /*RP_NODE*/
 
     if (myid == 0) {printf("\nFinished UDF read_vof_face_ids.\n"); fflush(stdout);}
 }
 
-DEFINE_ON_DEMAND(test){
+DEFINE_PROFILE(sbm_profile, face_thread, alpha){
 
-#if !RP_HOST
-    int i_f, i_n, j, thread, node_number, i_f_min, match_counter, total_matches;
+    int i_f, i_n, j, node_number, total_matches;
+    int i_f_min = 0, match_counter = 0;
     bool match_found, all_matched;
-    Domain *domain = Get_Domain(1);
-    Thread *face_thread;
     face_t face;
     Node *node;
-    real centroid[ND_ND];
-	real area[ND_ND];
-    real x[ND_ND]; /* this will hold the position vector */
     int node_ids[mnpf];
 
-    for (thread=0; thread<n_threads; thread++) { /* not in udf_profile because there you get the thread*/
-        face_thread = Lookup_Thread(domain, thread_ids[thread]);
-        i_f_min = 0;
-        match_counter = 0;
-        begin_f_loop(face,face_thread)
-        {
-            /* store node ids in array*/
-            for (i_n=0; i_n<mnpf; i_n++)
-                node_ids[i_n] = -1; /* if not all cells same number of nodes, fill with -1*/
+    /* TODO: can I only perform this code in the first iterations? */
+    /* int current_iter = (nres == 0) ? (0) : ((int) count2[nres - 1]); */
+    iteration = N_ITER;
+    timestep = RP_Get_Integer("time-step"); /* time step used, alternative would be interpolating flow time */
+    timestep = N_TIME; /* test */
+
+    begin_f_loop(face,face_thread)
+    {
+        /* initialize node_ids array */
+        for (i_n=0; i_n<mnpf; i_n++)
+            node_ids[i_n] = -1; /* if not all cells same number of nodes, fill with -1*/
+        i_n = 0;
+
+        /* store node ids in node_ids array*/
+        f_node_loop(face, face_thread, node_number) {
+            node = F_NODE(face, face_thread, node_number);
+            node_ids[i_n++] = NODE_DM_ID(node); /* store ID and post-increment iterator*/
+        }
+
+        /*compare ids to file to find correct line (assumed different order) */
+        for (i_f=i_f_min; i_f<n_faces; i_f++) {
+            all_matched = true;
             i_n = 0;
-
-            f_node_loop(face, face_thread, node_number) {
-                node = F_NODE(face, face_thread, node_number);
-                node_ids[i_n++] = NODE_DM_ID(node); /* store ID and post-increment iterator*/
-            }
-            /*compare ids to file to find correct line (assumed different order) */
-            for (i_f=i_f_min; i_f<n_faces; i_f++) {
-                all_matched = true;
-                i_n = 0;
-                while (all_matched && (i_n < mnpf)) {
-                    match_found = false;
-                    j = 0;
-                    while (!match_found && (j < mnpf)) {  /* compare them without assuming ordering */
-                        match_found = (ids[i_n][i_f] == node_ids[j++]); /* compare and post-increment j */
-                    }
-                    if (!match_found) {
-                        all_matched = false;
-                    }
-                    else {
-                    i_n++;
-                    }
+            while (all_matched && (i_n < mnpf)) {
+                match_found = false;
+                j = 0;
+                while (!match_found && (j < mnpf)) {  /* compare them without assuming ordering */
+                    match_found = (ids[i_n][i_f] == node_ids[j++]); /* compare and post-increment j */
                 }
-                if (all_matched) {
-                    match_counter++;
-                    break;  /* current i_f will be number in file */
+                if (!match_found) {
+                    all_matched = false;
+                }
+                else {
+                i_n++;
                 }
             }
-            if (i_f == i_f_min + 1) {
-                i_f_min++; /* for efficiency */
+            if (all_matched) {
+                match_counter++;
+                break;  /* current i_f will be number in file */
             }
-            /* do SBM profile stuff */
         }
-        end_f_loop(f,t)
-        total_matches = PRF_GRSUM1(match_counter);
-        if (total_matches != n_faces) {
-            Error("UDF-error: total matches %i not equal to number of faces %i", total_matches, n_faces);
+        if (i_f == i_f_min + 1) {
+            i_f_min++; /* for efficiency */
         }
+        /* apply SBM to VOF boundary profile */
+        F_PROFILE(face, face_thread, alpha) = vof_w[timestep][i_f];
     }
-
-#endif /*!RP_HOST*/
+    end_f_loop(face,face_thread)
+    total_matches = PRF_GRSUM1(match_counter);
+    if (total_matches != n_faces) {
+        Error("UDF-error: total matches %i not equal to number of faces %i", total_matches, n_faces);
+    }
 }
