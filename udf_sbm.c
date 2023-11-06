@@ -62,15 +62,15 @@ for (_d = 0; _d < dim; _d++) {                                      \
 }
 
 /* global variables */
-#define mnpf 4 /*max nodes per face hardcoded */
-#define n_slices 20000 /* change! */
-#define time_step_start 0
+#define mnpf |MAX_NODES_PER_FACE| /* max nodes per face (substituted) */
+#define n_time_steps |N_TIME_STEPS| /* number of time steps (substituted) */
+#define time_step_start |TIME_STEP_START| /* start time step (substituted) */
 int _d; /* don't use in UDFs! */
 int n_threads;
 int n_faces;
 DECLARE_MEMORY(thread_ids, int);
 DECLARE_MEMORY_N(ids, int, mnpf);
-DECLARE_MEMORY_N(vof_w, int, n_slices);
+DECLARE_MEMORY_N(vof_w, int, n_time_steps);
 int previous_time_step = time_step_start - 1;
 bool data_loaded = false;
 
@@ -142,9 +142,11 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
         }
 
 #if RP_2D
-        fprintf(file_faces, "%27s %27s %27s %27s      %10s\n", "x-coordinate", "y-coordinate", "x-area", "y-area", "unique-ids");
+        fprintf(file_faces, "%27s %27s %27s %27s      %10s\n", "x-coordinate", "y-coordinate", "x-area", "y-area",
+        "unique-ids");
 #else /* RP_2D */
-        fprintf(file_faces, "%27s %27s %27s %27s %27s %27s      %10s\n", "x-coordinate", "y-coordinate", "z-coordinate", "x-area", "y-area", "z-area",  "unique-ids");
+        fprintf(file_faces, "%27s %27s %27s %27s %27s %27s      %10s\n", "x-coordinate", "y-coordinate", "z-coordinate",
+        "x-area", "y-area", "z-area",  "unique-ids");
 #endif /* RP_2D */
 #endif /* !RP_NODE */
 
@@ -300,13 +302,13 @@ int compute_node;
     }
 
     ASSIGN_MEMORY_N(ids, n_faces, int, mnpf);
-    ASSIGN_MEMORY_N(vof_w, n_faces, int, n_slices);
+    ASSIGN_MEMORY_N(vof_w, n_faces, int, n_time_steps);
 
     for (i=0; i<n_faces; i++){
         for (j=0; j<mnpf; j++){
             fscanf(fp_ids, "%i", &ids[j][i]);
         }
-        for (j=0; j<n_slices; j++){
+        for (j=0; j<n_time_steps; j++){
             fscanf(fp_vof, "%i", &vof_w[j][i]);
         }
     }
@@ -320,25 +322,25 @@ int compute_node;
 
 #if RP_HOST
     PRF_CSEND_INT_N(node_zero, ids, n_faces, myid, mnpf); /* send from host to node0 */
-    PRF_CSEND_INT_N(node_zero, vof_w, n_faces, myid, n_slices); /* send from host to node0 */
+    PRF_CSEND_INT_N(node_zero, vof_w, n_faces, myid, n_time_steps); /* send from host to node0 */
     /* should the memory be freed? */
 #endif /*RP_HOST*/
 
 #if RP_NODE
     ASSIGN_MEMORY_N(ids, n_faces, int, mnpf);
-    ASSIGN_MEMORY_N(vof_w, n_faces, int, n_slices);
+    ASSIGN_MEMORY_N(vof_w, n_faces, int, n_time_steps);
 
     if(I_AM_NODE_ZERO_P){
         PRF_CRECV_INT_N(node_host, ids, n_faces, node_host, mnpf);
-        PRF_CRECV_INT_N(node_host, vof_w, n_faces, node_host, n_slices);
+        PRF_CRECV_INT_N(node_host, vof_w, n_faces, node_host, n_time_steps);
         compute_node_loop_not_zero(compute_node){
         PRF_CSEND_INT_N(compute_node, ids, n_faces, myid, mnpf);
-        PRF_CSEND_INT_N(compute_node, vof_w, n_faces, myid, n_slices);
+        PRF_CSEND_INT_N(compute_node, vof_w, n_faces, myid, n_time_steps);
         }
     }
     else {
         PRF_CRECV_INT_N(node_zero, ids, n_faces, node_zero, mnpf);
-        PRF_CRECV_INT_N(node_zero, vof_w, n_faces, node_zero, n_slices);
+        PRF_CRECV_INT_N(node_zero, vof_w, n_faces, node_zero, n_time_steps);
     }
 #endif /*RP_NODE*/
 
@@ -356,7 +358,7 @@ DEFINE_PROFILE(sbm_profile, face_thread, alpha){
     int node_ids[mnpf];
     int time_step = N_TIME;
 
-    if (time_step - previous_time_step > 1) {previous_time_step = time_step -1;} /* restart in same SBM data array */
+    if (time_step - previous_time_step > 1) {previous_time_step = time_step - 1;} /* restart in same SBM data array */
 
     if (time_step == previous_time_step + 1 && data_loaded){ /* only execute first call of time step */
 
