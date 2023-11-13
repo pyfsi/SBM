@@ -350,13 +350,14 @@ int compute_node;
 
 DEFINE_PROFILE(sbm_profile, face_thread, alpha){
 
-    int i_f, i_n, j, node_number, total_matches;
-    int i_f_min = 0, match_counter = 0;
-    bool match_found, all_matched;
+    int i_f, i_n, j, node_number;
+    int i_f_min = 0, match_counter = 0, index=0;
+    bool match_found, all_matched = true;
     face_t face;
     Node *node;
     int node_ids[mnpf];
     int time_step = N_TIME;
+    char node_ids_str[128];
 
     if (time_step - previous_time_step > 1) {previous_time_step = time_step - 1;} /* restart in same SBM data array */
 
@@ -399,17 +400,19 @@ DEFINE_PROFILE(sbm_profile, face_thread, alpha){
                     break;  /* current i_f will be number in file */
                 }
             }
-            if (i_f == i_f_min + 1) {
-                i_f_min++; /* for efficiency */
+            if (!all_matched){
+                for (j=0; j<mnpf; j++){
+                index += sprintf(&node_ids_str[index], "%i ", node_ids[j]);
+                }
+                printf("Error on Node %i: no match found for face %s\n", myid, node_ids_str); fflush(stdout);
+            }
+            if (i_f == i_f_min) {
+                i_f_min++; /* for efficiency, especially if only 1 node handles inlet */
             }
             /* apply SBM to VOF boundary profile */
             F_PROFILE(face, face_thread, alpha) = vof_w[time_step-time_step_start][i_f];
         }
         end_f_loop(face,face_thread)
-        total_matches = PRF_GRSUM1(match_counter);
-        if (total_matches != n_faces) {
-            Error("UDF-error: total matches %i not equal to number of faces %i", total_matches, n_faces);
-        }
     }
     else if (myid == 0 && !data_loaded) {printf("Warning: no data for the SBM was loaded!\n");}
 }
