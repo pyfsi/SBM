@@ -17,7 +17,10 @@ print("Starting inlet modelling script.\n")
 # Read input from bash-script
 if len(sys.argv) != 14:
     sys.exit(
-        "13 arguments should be used: case path - start time - end time - time step size - unit time - inlet name - gas density - liquid density - gas mass per tunit -tolerance on gas mass to be inserted per tunit- velocity - a boolean indicating whether prescribed bubbles may intersect with domain boundaries - a boolean indicating whether prescribed bubbles may interest with previously defined bubbles.. ")
+        "13 arguments should be used: case path - start time - end time - time step size - unit time - inlet name - "
+        "gas density - liquid density - gas mass per tunit -tolerance on gas mass to be inserted per tunit- velocity - "
+        "a boolean indicating whether prescribed bubbles may intersect with domain boundaries - a boolean indicating "
+        "whether prescribed bubbles may interest with previously defined bubbles.. ")
 casePath = str(sys.argv[1])
 startTime = float(sys.argv[2])
 endTime = float(sys.argv[3])
@@ -129,7 +132,7 @@ def bubbleShape(C_ID, C_t, timeInterval, shapeID, mgb, mg_StillRequired):
                      coordList[i, 3] - (U * timeVal[t * int(tunit / timeStepSize) + j]) * normalInlet[2]])
                 if np.linalg.norm(coordPoint-coordCenter) < rg:
                     if VOFwVal[i, timeInterval * int(
-                            tunit / timeStepSize) + j, 0] == 1.0:  # Every cells not yet occupied by bubble
+                            tunit / timeStepSize) + j, 0] == 1.0:  # Every cell not yet occupied by bubble
                         VOFwVal_temp[i, timeInterval * int(tunit / timeStepSize) + j, 0] = 0.0
                         UVal_temp[i, timeInterval * int(tunit / timeStepSize) + j, 0] = U * normalInlet[0]
                         UVal_temp[i, timeInterval * int(tunit / timeStepSize) + j, 1] = U * normalInlet[1]
