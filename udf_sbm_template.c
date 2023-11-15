@@ -70,7 +70,7 @@ int n_threads;
 int n_faces;
 DECLARE_MEMORY(thread_ids, int);
 DECLARE_MEMORY_N(ids, int, mnpf);
-DECLARE_MEMORY_N(vof_w, int, n_time_steps);
+DECLARE_MEMORY_N(vof_w, int, n_time_steps +1);
 int previous_time_step = time_step_start - 1;
 bool data_loaded = false;
 
@@ -302,13 +302,13 @@ int compute_node;
     }
 
     ASSIGN_MEMORY_N(ids, n_faces, int, mnpf);
-    ASSIGN_MEMORY_N(vof_w, n_faces, int, n_time_steps);
+    ASSIGN_MEMORY_N(vof_w, n_faces, int, n_time_steps + 1);
 
     for (i=0; i<n_faces; i++){
         for (j=0; j<mnpf; j++){
             fscanf(fp_ids, "%i", &ids[j][i]);
         }
-        for (j=0; j<n_time_steps; j++){
+        for (j=0; j<n_time_steps + 1; j++){ /* one more than n_time_steps, because initial value is included */
             fscanf(fp_vof, "%i", &vof_w[j][i]);
         }
     }
@@ -322,25 +322,25 @@ int compute_node;
 
 #if RP_HOST
     PRF_CSEND_INT_N(node_zero, ids, n_faces, myid, mnpf); /* send from host to node0 */
-    PRF_CSEND_INT_N(node_zero, vof_w, n_faces, myid, n_time_steps); /* send from host to node0 */
+    PRF_CSEND_INT_N(node_zero, vof_w, n_faces, myid, n_time_steps + 1); /* send from host to node0 */
     /* should the memory be freed? */
 #endif /*RP_HOST*/
 
 #if RP_NODE
     ASSIGN_MEMORY_N(ids, n_faces, int, mnpf);
-    ASSIGN_MEMORY_N(vof_w, n_faces, int, n_time_steps);
+    ASSIGN_MEMORY_N(vof_w, n_faces, int, n_time_steps + 1);
 
     if(I_AM_NODE_ZERO_P){
         PRF_CRECV_INT_N(node_host, ids, n_faces, node_host, mnpf);
-        PRF_CRECV_INT_N(node_host, vof_w, n_faces, node_host, n_time_steps);
+        PRF_CRECV_INT_N(node_host, vof_w, n_faces, node_host, n_time_steps + 1);
         compute_node_loop_not_zero(compute_node){
         PRF_CSEND_INT_N(compute_node, ids, n_faces, myid, mnpf);
-        PRF_CSEND_INT_N(compute_node, vof_w, n_faces, myid, n_time_steps);
+        PRF_CSEND_INT_N(compute_node, vof_w, n_faces, myid, n_time_steps + 1);
         }
     }
     else {
         PRF_CRECV_INT_N(node_zero, ids, n_faces, node_zero, mnpf);
-        PRF_CRECV_INT_N(node_zero, vof_w, n_faces, node_zero, n_time_steps);
+        PRF_CRECV_INT_N(node_zero, vof_w, n_faces, node_zero, n_time_steps + 1);
     }
 #endif /*RP_NODE*/
 
@@ -405,6 +405,8 @@ DEFINE_PROFILE(sbm_profile, face_thread, alpha){
                 index += sprintf(&node_ids_str[index], "%i ", node_ids[j]);
                 }
                 printf("Error on Node %i: no match found for face %s\n", myid, node_ids_str); fflush(stdout);
+                index = 0;
+                memset(node_ids_str, 0, sizeof(node_ids_str));
             }
             if (i_f == i_f_min) {
                 i_f_min++; /* for efficiency, especially if only 1 node handles inlet */
