@@ -82,22 +82,22 @@ DEFINE_ON_DEMAND(get_inlet_thread_ids) {
     /* read in thread thread ids, should be called early on */
     if (myid == 0) {printf("\n\nStarted UDF get_inlet_thread_ids.\n"); fflush(stdout);}
 
-#if !RP_NODE
+#if RP_HOST
     int k;
     FILE *file;
     file = fopen("inlets.txt", "r");
     fscanf(file, "%i", &n_threads);
-#endif /* !RP_NODE */
+#endif /* RP_HOST */
 
     host_to_node_int_1(n_threads);
     ASSIGN_MEMORY(thread_ids, n_threads, int);
 
-#if !RP_NODE
+#if RP_HOST
     for (k = 0; k < n_threads; k++) {
         fscanf(file, "%*s %i", &thread_ids[k]);
     }
     fclose(file);
-#endif /* !RP_NODE */
+#endif /* RP_HOST */
 
     host_to_node_int(thread_ids, n_threads);
 
@@ -117,7 +117,7 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
 	DECLARE_MEMORY_N(face_areas, real, ND_ND);
     DECLARE_MEMORY_N(face_ids, int, mnpf);
 
-#if !RP_HOST
+#if RP_NODE
     Domain *domain;
     Thread *face_thread;
 	Node *node;
@@ -125,17 +125,17 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
     int node_number, j;
     real centroid[ND_ND];
 	real area[ND_ND];
-#endif /* !RP_HOST */
+#endif /* RP_NODE */
 
-#if !RP_NODE
+#if RP_HOST
     char file_faces_name[ ] = "faces.dat";
     FILE *file_faces = NULL;
-#endif /* !RP_NODE */
+#endif /* RP_HOST */
 
 
     for (thread=0; thread<n_threads; thread++) {
 
-#if !RP_NODE
+#if RP_HOST
         if (NULLP(file_faces = fopen(file_faces_name, "w"))) {
             Error("\nUDF-error: Unable to open %s for writing\n", file_faces_name);
             exit(1);
@@ -148,9 +148,9 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
         fprintf(file_faces, "%27s %27s %27s %27s %27s %27s      %10s\n", "x-coordinate", "y-coordinate", "z-coordinate",
         "x-area", "y-area", "z-area",  "unique-ids");
 #endif /* RP_2D */
-#endif /* !RP_NODE */
+#endif /* RP_HOST */
 
-#if !RP_HOST
+#if RP_NODE
         domain = Get_Domain(1);
         face_thread = Lookup_Thread(domain, thread_ids[thread]);
         n_faces = THREAD_N_ELEMENTS_INT(face_thread);
@@ -185,9 +185,7 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
             }
             i_f++;
         } end_f_loop(face, face_thread);
-#endif /* !RP_HOST */
 
-#if RP_NODE
         compute_node = (I_AM_NODE_ZERO_P) ? node_host : node_zero;
 
         PRF_CSEND_INT(compute_node, &n_faces, 1, myid);
@@ -236,9 +234,7 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
             PRF_CRECV_REAL_N(node_zero, face_coords, n_faces, compute_node, ND_ND);
             PRF_CRECV_REAL_N(node_zero, face_areas, n_faces, compute_node, ND_ND);
             PRF_CRECV_INT_N(node_zero, face_ids, n_faces, compute_node, mnpf);
-#endif /* RP_HOST */
 
-#if !RP_NODE
             for (i_f = 0; i_f < n_faces; i_f++) {
                 for (d = 0; d < ND_ND; d++) {
                     fprintf(file_faces, "%27.17e ", face_coords[d][i_f]);
@@ -255,15 +251,9 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
             RELEASE_MEMORY_N(face_coords, ND_ND);
             RELEASE_MEMORY_N(face_areas, ND_ND);
             RELEASE_MEMORY_N(face_ids, mnpf);
-#endif /* !RP_NODE */
-
-#if RP_HOST
         } /* close compute_node_loop */
-#endif /* RP_HOST */
-
-#if !RP_NODE
         fclose(file_faces);
-#endif /* !RP_NODE */
+#endif /* RP_HOST */
 
     } /* close loop over threads */
 
@@ -282,7 +272,7 @@ DEFINE_ON_DEMAND(read_vof_face_ids) {
 int compute_node;
 #endif /*RP_NODE*/
 
-#if !RP_NODE
+#if RP_HOST
     int i, j;
     char file_ids[] = "face_ids.dat";
     char file_vof[30];
@@ -315,7 +305,7 @@ int compute_node;
     fclose(fp_ids);
     fclose(fp_vof);
 
-#endif /*!RP_NODE*/
+#endif /*RP_HOST*/
 
     /* Send data to nodes */
     host_to_node_int_1(n_faces);
@@ -323,7 +313,6 @@ int compute_node;
 #if RP_HOST
     PRF_CSEND_INT_N(node_zero, ids, n_faces, myid, mnpf); /* send from host to node0 */
     PRF_CSEND_INT_N(node_zero, vof_w, n_faces, myid, n_time_steps + 1); /* send from host to node0 */
-    /* should the memory be freed? */
 #endif /*RP_HOST*/
 
 #if RP_NODE
