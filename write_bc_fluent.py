@@ -27,7 +27,11 @@ with open('write_bc.log', 'w') as logfile:
                                          cleanup_on_exit=False)
 
         session.scheme_eval.scheme_eval("(enable-dynamic-mesh-node-ids #t)")
-        session.read_case(case_path / case_name)
+        if time_step_start:
+            session.file.read(file_type="case-data", file_name=case_path / case_name)
+        else:
+            session.file.read(file_type="case", file_name=case_path / case_name)
+
         # Compile and use UDF
         session.tui.define.user_defined.compiled_functions("compile", "sbm_lib", "yes", "udf_sbm.c")
         session.tui.define.user_defined.compiled_functions("load", "sbm_lib")
@@ -37,4 +41,6 @@ with open('write_bc.log', 'w') as logfile:
         #                                                           "yes", "udf", "sbm_profile::libudf", "quit")
         session.setup.boundary_conditions.velocity_inlet['inlet'].phase['water'].volume_fraction = \
             {"option": "udf", "udf": "sbm_profile::sbm_lib"}
+
+        session.solution.run_calculation.transient_controls.time_step_count = VOFw.shape[1] - 1
         session.exit()
