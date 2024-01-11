@@ -114,7 +114,7 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
 
     int thread, i_f, d, compute_node;
     DECLARE_MEMORY_N(face_coords, real, ND_ND);
-	DECLARE_MEMORY_N(face_areas, real, ND_ND);
+    DECLARE_MEMORY_N(face_areas, real, ND_ND);
     DECLARE_MEMORY_N(face_ids, int, mnpf);
 
 #if RP_NODE
@@ -131,7 +131,6 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
     char file_faces_name[ ] = "faces.dat";
     FILE *file_faces = NULL;
 #endif /* RP_HOST */
-
 
     for (thread=0; thread<n_threads; thread++) {
 
