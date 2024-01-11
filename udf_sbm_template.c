@@ -70,7 +70,7 @@ int n_threads;
 int n_faces;
 DECLARE_MEMORY(thread_ids, int);
 DECLARE_MEMORY_N(ids, int, mnpf);
-DECLARE_MEMORY_N(vof_w, int, n_time_steps +1);
+DECLARE_MEMORY_N(vof_w, int, n_time_steps + 1);
 int previous_time_step = time_step_start - 1;
 bool data_loaded = false;
 
@@ -124,7 +124,7 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
     face_t face;
     int node_number, j;
     real centroid[ND_ND];
-	real area[ND_ND];
+    real area[ND_ND];
 #endif /* RP_NODE */
 
 #if RP_HOST
