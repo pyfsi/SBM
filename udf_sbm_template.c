@@ -120,7 +120,7 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
 #if RP_NODE
     Domain *domain;
     Thread *face_thread;
-	Node *node;
+    Node *node;
     face_t face;
     int node_number, j;
     real centroid[ND_ND];
@@ -157,18 +157,18 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
 
         ASSIGN_MEMORY_N(face_coords, n_faces, real, ND_ND);
         ASSIGN_MEMORY_N(face_ids, n_faces, int, mnpf);
-		ASSIGN_MEMORY_N(face_areas, n_faces, real, ND_ND);
+        ASSIGN_MEMORY_N(face_areas, n_faces, real, ND_ND);
 
         i_f = 0;
         begin_f_loop(face, face_thread) {
             if (i_f >= n_faces) {Error("\nUDF-error: Index %i >= array size %i.", i_f, n_faces);}
 
             F_CENTROID(centroid, face, face_thread); /*centroid of face returned from F_CENTROID */
-			F_AREA(area,face,face_thread); /* face normal vector returned from F_AREA */
+            F_AREA(area,face,face_thread); /* face normal vector returned from F_AREA */
 
             for (d = 0; d < ND_ND; d++) {
                 face_coords[d][i_f] = centroid[d];
-				face_areas[d][i_f] = area[d];
+                face_areas[d][i_f] = area[d];
             }
 
             for (j = 0; j < mnpf; j++) {
@@ -269,7 +269,7 @@ DEFINE_ON_DEMAND(read_vof_face_ids) {
     if (myid == 0) {printf("\nStarted UDF read_vof_face_ids.\n"); fflush(stdout);}
 
 #if RP_NODE
-int compute_node;
+    int compute_node;
 #endif /*RP_NODE*/
 
 #if RP_HOST
