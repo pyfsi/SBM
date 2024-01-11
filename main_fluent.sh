@@ -2,9 +2,9 @@
 # This is the main script for applying the SBM to an inlet with large gas bubbles entering a continuous liquid. This
 # script is only used to concentrate the user-input for the model (and is dependent on the flow solver the user wants to
 # use, denoted by the main IF-statement in the script). In this example Fluent is used. The modelling itself is done in
-# two Python-scripts: the first one ("TubeBundle_ReadInlet_<solver>.py") is flow solver-dependent and is used to create
-# a table from the inlet geometry of the case. The second script ("TubeBundle_InletModelling.py") is solver-independent
-# and creates the actual inlet. The bubble shapes which are used, are defined in the "TubeBundle-InletModelling" script.
+# two Python-scripts: the first one ("read_inlet_<solver>.py") is flow solver-dependent and is used to create a table
+# from the inlet geometry of the case. The second script ("InletModelling.py") is solver-independent and creates the
+# actual inlet. The used bubble shapes are defined in "InletModelling.py".
 
 # User input 
 export CFD_PROGRAMME=ANSYS_CFD
