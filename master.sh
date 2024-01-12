@@ -9,9 +9,9 @@
 # User input 
 export CFD_PROGRAMME=ANSYS_CFD
 export CFD_VERSION=2023R1 # Version of the CFD-solver (module name= CFD_PROGRAMME/CFD_VERSION)
-export PYTHON_VERSION=Anaconda3-python
+export PYTHON_VERSION=Anaconda3-python/2022.10
 export DIM=3 # Number of geometrical dimensions of the case (either 2 or 3)
-export CASE_PATH=~/henri/GO-VIKING/Box_2 # Location of base case
+export CASE_PATH=~/GO-VIKING/Box_2 # Location of base case
 export startTime=0 # First flow time to be defined
 export endTime=5 # Last flow time to be defined
 export timeStepSize=0.0001 # Time step size to be used in following calculation
