@@ -112,7 +112,7 @@ DEFINE_ON_DEMAND(get_inlet_thread_ids) {
 DEFINE_ON_DEMAND(store_faces_normals_ids) {
     if (myid == 0) {printf("\n\nStarted UDF store_faces_normals_id.\n"); fflush(stdout);}
 
-    int thread, i_f, d, compute_node;
+    int thread, i_f, d, receiving_node, sending_node;
     DECLARE_MEMORY_N(face_coords, real, ND_ND);
     DECLARE_MEMORY_N(face_areas, real, ND_ND);
     DECLARE_MEMORY_N(face_ids, int, mnpf);
@@ -185,35 +185,37 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
             i_f++;
         } end_f_loop(face, face_thread);
 
-        compute_node = (I_AM_NODE_ZERO_P) ? node_host : node_zero;
+        /* information either sent from nodes to node 0 or from node 0 to host */
+        receiving_node = (I_AM_NODE_ZERO_P) ? node_host : node_zero;
 
-        PRF_CSEND_INT(compute_node, &n_faces, 1, myid);
+        PRF_CSEND_INT(receiving_node, &n_faces, 1, myid);
 
-        PRF_CSEND_REAL_N(compute_node, face_coords, n_faces, myid, ND_ND);
-        PRF_CSEND_REAL_N(compute_node, face_areas, n_faces, myid, ND_ND);
-        PRF_CSEND_INT_N(compute_node, face_ids, n_faces, myid, mnpf);
+        PRF_CSEND_REAL_N(receiving_node, face_coords, n_faces, myid, ND_ND);
+        PRF_CSEND_REAL_N(receiving_node, face_areas, n_faces, myid, ND_ND);
+        PRF_CSEND_INT_N(receiving_node, face_ids, n_faces, myid, mnpf);
 
         RELEASE_MEMORY_N(face_coords, ND_ND);
         RELEASE_MEMORY_N(face_areas, ND_ND);
         RELEASE_MEMORY_N(face_ids, mnpf);
 
         if(I_AM_NODE_ZERO_P){
-            compute_node_loop_not_zero(compute_node) {
-                PRF_CRECV_INT(compute_node, &n_faces, 1, compute_node);
+            compute_node_loop_not_zero(sending_node) { /* node 0 receives from other nodes and passes on to host */
+                PRF_CRECV_INT(sending_node, &n_faces, 1, sending_node);
 
                 ASSIGN_MEMORY_N(face_coords, n_faces, real, ND_ND);
                 ASSIGN_MEMORY_N(face_areas, n_faces, real, ND_ND);
                 ASSIGN_MEMORY_N(face_ids, n_faces, int, mnpf);
 
-                PRF_CRECV_REAL_N(compute_node, face_coords, n_faces, compute_node, ND_ND);
-                PRF_CRECV_REAL_N(compute_node, face_areas, n_faces, compute_node, ND_ND);
-                PRF_CRECV_INT_N(compute_node, face_ids, n_faces, compute_node, mnpf);
+                PRF_CRECV_REAL_N(sending_node, face_coords, n_faces, sending_node, ND_ND);
+                PRF_CRECV_REAL_N(sending_node, face_areas, n_faces, sending_node, ND_ND);
+                PRF_CRECV_INT_N(sending_node, face_ids, n_faces, sending_node, mnpf);
 
-                PRF_CSEND_INT(node_host, &n_faces, 1, compute_node);
+                /* Node 0 passes on messages from sending nodes to host node */
+                PRF_CSEND_INT(node_host, &n_faces, 1, sending_node);
 
-                PRF_CSEND_REAL_N(node_host, face_coords, n_faces, compute_node, ND_ND);
-                PRF_CSEND_REAL_N(node_host, face_areas, n_faces, compute_node, ND_ND);
-                PRF_CSEND_INT_N(node_host, face_ids, n_faces, compute_node, mnpf);
+                PRF_CSEND_REAL_N(node_host, face_coords, n_faces, sending_node, ND_ND);
+                PRF_CSEND_REAL_N(node_host, face_areas, n_faces, sending_node, ND_ND);
+                PRF_CSEND_INT_N(node_host, face_ids, n_faces, sending_node, mnpf);
 
                 RELEASE_MEMORY_N(face_coords, ND_ND);
                 RELEASE_MEMORY_N(face_areas, ND_ND);
@@ -223,16 +225,17 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
 #endif /* RP_NODE */
 
 #if RP_HOST
-        compute_node_loop(compute_node) {
-            PRF_CRECV_INT(node_zero, &n_faces, 1, compute_node);
+        compute_node_loop(sending_node) {
+        /* Host node receives messages from sending nodes */
+            PRF_CRECV_INT(node_zero, &n_faces, 1, sending_node);
 
             ASSIGN_MEMORY_N(face_coords, n_faces, real, ND_ND);
             ASSIGN_MEMORY_N(face_areas, n_faces, real, ND_ND);
             ASSIGN_MEMORY_N(face_ids, n_faces, int, mnpf);
 
-            PRF_CRECV_REAL_N(node_zero, face_coords, n_faces, compute_node, ND_ND);
-            PRF_CRECV_REAL_N(node_zero, face_areas, n_faces, compute_node, ND_ND);
-            PRF_CRECV_INT_N(node_zero, face_ids, n_faces, compute_node, mnpf);
+            PRF_CRECV_REAL_N(node_zero, face_coords, n_faces, sending_node, ND_ND);
+            PRF_CRECV_REAL_N(node_zero, face_areas, n_faces, sending_node, ND_ND);
+            PRF_CRECV_INT_N(node_zero, face_ids, n_faces, sending_node, mnpf);
 
             for (i_f = 0; i_f < n_faces; i_f++) {
                 for (d = 0; d < ND_ND; d++) {
@@ -268,7 +271,7 @@ DEFINE_ON_DEMAND(read_vof_face_ids) {
     if (myid == 0) {printf("\nStarted UDF read_vof_face_ids.\n"); fflush(stdout);}
 
 #if RP_NODE
-    int compute_node;
+    int receiving_node;
 #endif /*RP_NODE*/
 
 #if RP_HOST
@@ -321,9 +324,9 @@ DEFINE_ON_DEMAND(read_vof_face_ids) {
     if(I_AM_NODE_ZERO_P){
         PRF_CRECV_INT_N(node_host, ids, n_faces, node_host, mnpf);
         PRF_CRECV_INT_N(node_host, vof_w, n_faces, node_host, n_time_steps);
-        compute_node_loop_not_zero(compute_node){
-        PRF_CSEND_INT_N(compute_node, ids, n_faces, myid, mnpf);
-        PRF_CSEND_INT_N(compute_node, vof_w, n_faces, myid, n_time_steps);
+        compute_node_loop_not_zero(receiving_node){
+        PRF_CSEND_INT_N(receiving_node, ids, n_faces, myid, mnpf);
+        PRF_CSEND_INT_N(receiving_node, vof_w, n_faces, myid, n_time_steps);
         }
     }
     else {
