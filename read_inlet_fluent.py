@@ -66,7 +66,8 @@ with open('read_inlet.log', 'w') as logfile:
             with open('udf_sbm.c', 'w') as outfile:
                 for line in infile:
                     line = line.replace('|MAX_NODES_PER_FACE|', str(mnpf))
-                    line = line.replace('|N_TIME_STEPS|', str(n_time_steps))
+                    # one more than n_time_steps, because initial value is included
+                    line = line.replace('|N_TIME_STEPS|', str(n_time_steps + 1))
                     line = line.replace('|TIME_STEP_START|', str(time_step_start))
                     outfile.write(line)
 
