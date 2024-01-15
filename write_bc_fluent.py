@@ -6,13 +6,15 @@ import numpy as np
 import multiprocessing
 
 # Read input from bash-script
-if len(sys.argv) != 6:
-    sys.exit("5 arguments should be used: dimensions - case path - case name - start time step - inlet boundary name.")
+if len(sys.argv) != 7:
+    sys.exit("6 arguments should be used: dimensions - case path - case name - start time step - inlet boundary name"
+             "- cores.")
 dimensions = int(sys.argv[1])
 case_path = Path(sys.argv[2])
 case_name = str(sys.argv[3])
 time_step_start = int(sys.argv[4])
 boundary_name = str(sys.argv[5])
+cores = min(int(sys.argv[6]), multiprocessing.cpu_count())
 
 VOFw = np.load('inletDefinition-VOFw.npy')
 face_ids = np.load('face_ids.npy')
@@ -23,8 +25,7 @@ with open('write_bc.log', 'w') as logfile:
     with redirect_stdout(logfile):
         # Launch fluent and read case
         session = pyfluent.launch_fluent(mode="solver", precision="double", version=f"{dimensions}d",
-                                         processor_count=multiprocessing.cpu_count(), show_gui=True,
-                                         cleanup_on_exit=False)
+                                         processor_count=cores, show_gui=True, cleanup_on_exit=False)
 
         session.scheme_eval.scheme_eval("(enable-dynamic-mesh-node-ids #t)")
         if time_step_start:

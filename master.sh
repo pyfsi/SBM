@@ -28,6 +28,7 @@ export mnpf=4 # max nodes per face (Fluent)
 export time_step_start=0 # start_time_step (Fluent)
 export n_time_steps=50000 # number of time steps (Fluent)
 export case_name=second_test.cas.h5 # name of case file (Fluent)
+export CORES=4 # number of cores to be used
 
 # Load Python (inlet modelling performed in Python Anaconda)
 module load $PYTHON_VERSION
@@ -40,7 +41,7 @@ then
 	python readInlet_OpenFOAM.py $DIM $CASE_PATH $CFD_MODULE $startTime $inletName
 elif [ "$CFD_PROGRAMME" = "ANSYS_CFD" ]
 then
-  python read_inlet_fluent.py $DIM $CASE_PATH $case_name $time_step_start $n_time_steps $inletName $mnpf
+  python read_inlet_fluent.py $DIM $CASE_PATH $case_name $time_step_start $n_time_steps $inletName $mnpf $CORES
 else
   echo "The CFD-programme ($CFD_PROGRAMME) you have tried to use is not defined in the main script."
 	exit 1
@@ -56,7 +57,7 @@ then
 	python writeBC_OpenFOAM.py $CASE_PATH $startTime $inletName
 elif [ "$CFD_PROGRAMME" = "ANSYS_CFD" ]
 then
-  python write_bc_fluent.py
+  python write_bc_fluent.py $DIM $CASE_PATH $case_name $time_step_start $inletName $CORES
 else
   echo "The CFD-programme ($CFD_PROGRAMME) you have tried to use is not defined in the main script."
   exit 1

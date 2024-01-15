@@ -3,11 +3,12 @@ import sys
 from pathlib import Path
 from contextlib import redirect_stdout
 import numpy as np
+import multiprocessing
 
 # Read input from bash-script
-if len(sys.argv) != 8:
-    sys.exit("7 arguments should be used: dimensions - case path - case name - start time step - number of time steps - "
-             "inlet boundary name - max number of nodes per face.")
+if len(sys.argv) != 9:
+    sys.exit("8 arguments should be used: dimensions - case path - case name - start time step - number of time steps - "
+             "inlet boundary name - max number of nodes per face - cores.")
 dimensions = int(sys.argv[1])
 case_path = Path(sys.argv[2])
 case_name = str(sys.argv[3])
@@ -15,12 +16,13 @@ time_step_start = int(sys.argv[4])
 n_time_steps = int(sys.argv[5])
 boundary_name = str(sys.argv[6])
 mnpf = int(sys.argv[7])
+cores = min(int(sys.argv[8]), multiprocessing.cpu_count())
 
 with open('read_inlet.log', 'w') as logfile:
     with redirect_stdout(logfile):
         # Launch fluent and read case
-        session = pyfluent.launch_fluent(mode="solver", precision="double", version=f"{dimensions}d", processor_count=4,
-                                         show_gui=True)
+        session = pyfluent.launch_fluent(mode="solver", precision="double", version=f"{dimensions}d",
+                                         processor_count=cores, show_gui=True)
 
         session.scheme_eval.scheme_eval("(enable-dynamic-mesh-node-ids #t)")
         session.read_case(case_path / case_name)
