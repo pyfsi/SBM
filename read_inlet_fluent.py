@@ -92,7 +92,7 @@ coord_list[:, 4] = np.linalg.norm(faces[:, 3:6], axis=1)  # face areas
 face_ids = faces[:, 6:10]
 
 normal_inlets = faces[:, 3:6] / coord_list[:, 4].reshape(faces_n, 1)  # compute unit normals on each face
-tol = 1e-15
+tol = 1e-14
 if np.all(normal_inlets.std(axis=0) < tol):
     normal_inlet = normal_inlets.mean(axis=0)
 else:
