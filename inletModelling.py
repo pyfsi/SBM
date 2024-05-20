@@ -11,6 +11,7 @@ import numpy as np
 import sys
 import random  # package with random generator
 
+random.seed(37)
 
 print("Starting inlet modelling script.\n")
 
@@ -108,7 +109,8 @@ def bubbleShape(C_ID, C_t, timeInterval, shapeID, mgb, mg_StillRequired):
             return False, 0.0
         # If desired, check that the center point denoted by C_ID and C_t follows a certain set of requirements
         C_checked = True
-        timeLoc = C_time-startTime-int((C_time-startTime)/tunit)*tunit
+        timeLoc = C_time-startTime-int((C_time-startTime)/tunit)*tunit  # how many seconds compared to start t_unit
+        # Checks below prevents intersection with beginning of t_unit domain
         if timeLoc < rg/U:
             C_checked = False
         if timeLoc > (tunit-rg/U):
@@ -124,8 +126,12 @@ def bubbleShape(C_ID, C_t, timeInterval, shapeID, mgb, mg_StillRequired):
         mg_bubbleWall = 0.0
         coordCenter = np.array([C_coord[1] - (U * C_time) * normalInlet[0], C_coord[2] - (U * C_time) * normalInlet[1],
                                 C_coord[3] - (U * C_time) * normalInlet[2]])
-        for i in np.arange(len(coordList)):
-            for j in np.arange(int(tunit/timeStepSize)):
+
+        j_min = int((timeLoc - rg/U)/timeStepSize)
+        j_max = int(math.ceil((timeLoc + rg/U)/timeStepSize)) + 1
+
+        for i in np.arange(len(coordList)):  # could be made more efficient by doing already a 2D search in this list
+            for j in range(j_min, j_max):
                 coordPoint = np.array(
                     [coordList[i, 1] - (U * timeVal[t * int(tunit / timeStepSize) + j]) * normalInlet[0],
                      coordList[i, 2] - (U * timeVal[t * int(tunit / timeStepSize) + j]) * normalInlet[1],
@@ -196,21 +202,21 @@ np.save(casePath+'/inletDefinition-time.npy', timeVal) # List containing the tim
 print("Inlet profile saved in Python (numpy) npy-files. \n")
 
 # Check: convert to file compatible with ParaView to visualize your pre-inlet domain.
-print("Saving inlet profile to CSV-files. ")
-files = [casePath+'/inletDefinition-VOFw.csv', casePath+'/inletDefinition-Ux.csv', casePath+'/inletDefinition-Uy.csv', casePath+'/inletDefinition-Uz.csv']
-toWrite = [VOFwVal[:, :, 0], UVal[:, :, 0], UVal[:, :, 1], UVal[:, :, 2]]
-for fi in np.arange(len(files)):
-    f = open(files[fi], 'w')
-    f.write('x coord,y coord,z coord,value \n')
-    for i in np.arange(len(coordList[:, 0])):
-        for j in np.arange(len(timeVal)):
-            coordPoint = np.array([coordList[i, 1] - (U * timeVal[j]) * normalInlet[0],
-                                   coordList[i, 2] - (U * timeVal[j]) * normalInlet[1],
-                                   coordList[i, 3] - (U * timeVal[j]) * normalInlet[2]])
-            f.write(str(coordPoint[0]) + ',' + str(coordPoint[1]) + ',' + str(coordPoint[2]) + ',' + str(
-                toWrite[fi][i, j]) + '\n')
-    f.close()
-print("Inlet profile saved to CSV-files. ")
-
+# print("Saving inlet profile to CSV-files. ")
+# files = [casePath+'/inletDefinition-VOFw.csv', casePath+'/inletDefinition-Ux.csv', casePath+'/inletDefinition-Uy.csv', casePath+'/inletDefinition-Uz.csv']
+# toWrite = [VOFwVal[:, :, 0], UVal[:, :, 0], UVal[:, :, 1], UVal[:, :, 2]]
+# for fi in np.arange(len(files)):
+#     f = open(files[fi], 'w')
+#     f.write('x coord,y coord,z coord,value \n')
+#     for i in np.arange(len(coordList[:, 0])):
+#         for j in np.arange(len(timeVal)):
+#             coordPoint = np.array([coordList[i, 1] - (U * timeVal[j]) * normalInlet[0],
+#                                    coordList[i, 2] - (U * timeVal[j]) * normalInlet[1],
+#                                    coordList[i, 3] - (U * timeVal[j]) * normalInlet[2]])
+#             f.write(str(coordPoint[0]) + ',' + str(coordPoint[1]) + ',' + str(coordPoint[2]) + ',' + str(
+#                 toWrite[fi][i, j]) + '\n')
+#     f.close()
+# print("Inlet profile saved to CSV-files. ")
+#
 
 print("Script 'inletModelling' completed. \n")
