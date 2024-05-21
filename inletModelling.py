@@ -127,10 +127,14 @@ def bubbleShape(C_ID, C_t, timeInterval, shapeID, mgb, mg_StillRequired):
         coordCenter = np.array([C_coord[1] - (U * C_time) * normalInlet[0], C_coord[2] - (U * C_time) * normalInlet[1],
                                 C_coord[3] - (U * C_time) * normalInlet[2]])
 
+        i_mask = np.linalg.norm(coordList[:, 1:4] - C_coord[1:4], axis=1) < rg
+        i_list = i_mask.nonzero()[0]
+
         j_min = int((timeLoc - rg/U)/timeStepSize)
         j_max = int(math.ceil((timeLoc + rg/U)/timeStepSize)) + 1
 
-        for i in np.arange(len(coordList)):  # could be made more efficient by doing already a 2D search in this list
+        # nested loop could maybe be eliminated by vectorization: boolean arithmetic on the matrices
+        for i in i_list:
             for j in range(j_min, j_max):
                 coordPoint = np.array(
                     [coordList[i, 1] - (U * timeVal[t * int(tunit / timeStepSize) + j]) * normalInlet[0],
