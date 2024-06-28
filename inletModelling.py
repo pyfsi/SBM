@@ -11,8 +11,6 @@ import numpy as np
 import sys
 import random  # package with random generator
 
-random.seed(37)
-
 print("Starting inlet modelling script.\n")
 
 # Read input from bash-script
@@ -206,21 +204,21 @@ np.save(casePath+'/inletDefinition-time.npy', timeVal) # List containing the tim
 print("Inlet profile saved in Python (numpy) npy-files. \n")
 
 # Check: convert to file compatible with ParaView to visualize your pre-inlet domain.
-# print("Saving inlet profile to CSV-files. ")
-# files = [casePath+'/inletDefinition-VOFw.csv', casePath+'/inletDefinition-Ux.csv', casePath+'/inletDefinition-Uy.csv', casePath+'/inletDefinition-Uz.csv']
-# toWrite = [VOFwVal[:, :, 0], UVal[:, :, 0], UVal[:, :, 1], UVal[:, :, 2]]
-# for fi in np.arange(len(files)):
-#     f = open(files[fi], 'w')
-#     f.write('x coord,y coord,z coord,value \n')
-#     for i in np.arange(len(coordList[:, 0])):
-#         for j in np.arange(len(timeVal)):
-#             coordPoint = np.array([coordList[i, 1] - (U * timeVal[j]) * normalInlet[0],
-#                                    coordList[i, 2] - (U * timeVal[j]) * normalInlet[1],
-#                                    coordList[i, 3] - (U * timeVal[j]) * normalInlet[2]])
-#             f.write(str(coordPoint[0]) + ',' + str(coordPoint[1]) + ',' + str(coordPoint[2]) + ',' + str(
-#                 toWrite[fi][i, j]) + '\n')
-#     f.close()
-# print("Inlet profile saved to CSV-files. ")
-#
+print("Saving inlet profile to CSV-files. ")
+files = [casePath+'/inletDefinition-VOFw.csv', casePath+'/inletDefinition-Ux.csv', casePath+'/inletDefinition-Uy.csv', casePath+'/inletDefinition-Uz.csv']
+toWrite = [VOFwVal[:, :, 0], UVal[:, :, 0], UVal[:, :, 1], UVal[:, :, 2]]
+for fi in np.arange(len(files)):
+    f = open(files[fi], 'w')
+    f.write('x coord,y coord,z coord,value \n')
+    for i in np.arange(len(coordList[:, 0])):
+        for j in np.arange(len(timeVal)):
+            coordPoint = np.array([coordList[i, 1] - (U * timeVal[j]) * normalInlet[0],
+                                   coordList[i, 2] - (U * timeVal[j]) * normalInlet[1],
+                                   coordList[i, 3] - (U * timeVal[j]) * normalInlet[2]])
+            f.write(str(coordPoint[0]) + ',' + str(coordPoint[1]) + ',' + str(coordPoint[2]) + ',' + str(
+                toWrite[fi][i, j]) + '\n')
+    f.close()
+print("Inlet profile saved to CSV-files. ")
+
 
 print("Script 'inletModelling' completed. \n")
