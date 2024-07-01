@@ -11,7 +11,6 @@ import numpy as np
 import sys
 import random  # package with random generator
 
-
 print("Starting inlet modelling script.\n")
 
 # Read input from bash-script
@@ -108,7 +107,8 @@ def bubbleShape(C_ID, C_t, timeInterval, shapeID, mgb, mg_StillRequired):
             return False, 0.0
         # If desired, check that the center point denoted by C_ID and C_t follows a certain set of requirements
         C_checked = True
-        timeLoc = C_time-startTime-int((C_time-startTime)/tunit)*tunit
+        timeLoc = C_time-startTime-int((C_time-startTime)/tunit)*tunit  # how many seconds compared to start t_unit
+        # Checks below prevents intersection with beginning of t_unit domain
         if timeLoc < rg/U:
             C_checked = False
         if timeLoc > (tunit-rg/U):
@@ -124,8 +124,16 @@ def bubbleShape(C_ID, C_t, timeInterval, shapeID, mgb, mg_StillRequired):
         mg_bubbleWall = 0.0
         coordCenter = np.array([C_coord[1] - (U * C_time) * normalInlet[0], C_coord[2] - (U * C_time) * normalInlet[1],
                                 C_coord[3] - (U * C_time) * normalInlet[2]])
-        for i in np.arange(len(coordList)):
-            for j in np.arange(int(tunit/timeStepSize)):
+
+        i_mask = np.linalg.norm(coordList[:, 1:4] - C_coord[1:4], axis=1) < rg
+        i_list = i_mask.nonzero()[0]
+
+        j_min = int((timeLoc - rg/U)/timeStepSize)
+        j_max = int(math.ceil((timeLoc + rg/U)/timeStepSize)) + 1
+
+        # nested loop could maybe be eliminated by vectorization: boolean arithmetic on the matrices
+        for i in i_list:
+            for j in range(j_min, j_max):
                 coordPoint = np.array(
                     [coordList[i, 1] - (U * timeVal[t * int(tunit / timeStepSize) + j]) * normalInlet[0],
                      coordList[i, 2] - (U * timeVal[t * int(tunit / timeStepSize) + j]) * normalInlet[1],

@@ -25,7 +25,7 @@ with open('read_inlet.log', 'w') as logfile:
                                          processor_count=cores, show_gui=True)
 
         session.scheme_eval.scheme_eval("(enable-dynamic-mesh-node-ids #t)")
-        session.read_case(case_path / case_name)
+        session.tui.file.read_case(str(case_path / case_name))
 
         # Getting the thread id from Fluent similarly as is done in CoCoNuT
         # Could be replaced by using PyFluent SVARS, but does not work yet
@@ -92,7 +92,7 @@ coord_list[:, 4] = np.linalg.norm(faces[:, 3:6], axis=1)  # face areas
 face_ids = faces[:, 6:10]
 
 normal_inlets = faces[:, 3:6] / coord_list[:, 4].reshape(faces_n, 1)  # compute unit normals on each face
-tol = 1e-15
+tol = 1e-14
 if np.all(normal_inlets.std(axis=0) < tol):
     normal_inlet = normal_inlets.mean(axis=0)
 else:
