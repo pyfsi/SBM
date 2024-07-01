@@ -20,6 +20,8 @@ export inletName=inlet # Name of the inlet boundary to be modelled
 export rhog=1.225 # Density of the gas
 export rhol=998.2 # Density of the liquid
 export mg=0.214375 # Amount of the gas to be introduced in domain over a time 'tunit'
+export mgb_min=0.010719 # 5% of mg
+export mgb_max=0.042875 # 10 % of mg
 export tol_mg=1e-05 # Tolerance on the amount of gas to be introduced in domain over a time 'tunit'
 export U=1 # Velocity of the mixture  to be introduced in domain
 export intersectBoundary=True # Boolean indicating whether bubbles may intersect domain boundaries
@@ -48,7 +50,7 @@ else
 fi
 
 # Model the inlet : This script is designed to be case-independent
-python inletModelling.py $CASE_PATH $startTime $endTime $timeStepSize $tunit $inletName $rhog $rhol $mg $tol_mg $U $intersectBoundary $intersectBubble
+python inletModelling.py $CASE_PATH $startTime $endTime $timeStepSize $tunit $inletName $rhog $rhol $mg $tol_mg $U $intersectBoundary $intersectBubble $mgb_min $mgb_max
 
 # The modelled inlet has to be written in a format compatible with the flow solver that is to be used
 if [ "$CFD_PROGRAMME" = "OpenFOAM" ]
