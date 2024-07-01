@@ -14,12 +14,13 @@ import random  # package with random generator
 print("Starting inlet modelling script.\n")
 
 # Read input from bash-script
-if len(sys.argv) != 14:
+if len(sys.argv) != 16:
     sys.exit(
-        "13 arguments should be used: case path - start time - end time - time step size - unit time - inlet name - "
+        "15 arguments should be used: case path - start time - end time - time step size - unit time - inlet name - "
         "gas density - liquid density - gas mass per tunit -tolerance on gas mass to be inserted per tunit- velocity - "
         "a boolean indicating whether prescribed bubbles may intersect with domain boundaries - a boolean indicating "
-        "whether prescribed bubbles may interest with previously defined bubbles.. ")
+        "whether prescribed bubbles may interest with previously defined bubbles - the minimal mass per bubble - the "
+        "maximal mass per bubble. ")
 casePath = str(sys.argv[1])
 startTime = float(sys.argv[2])
 endTime = float(sys.argv[3])
@@ -33,6 +34,8 @@ tol_mg = float(sys.argv[10])
 U = float(sys.argv[11])
 intersectBoundary = str(sys.argv[12])
 intersectBubble = str(sys.argv[13])
+mgb_min = float(sys.argv[14])
+mgb_max = float(sys.argv[15])
 
 if int((endTime-startTime)/tunit) != ((endTime-startTime)/tunit):
     sys.exit("The desired time interval (endTime - startTime) should be a multiple of tunit.")
@@ -73,7 +76,7 @@ if np.sum(probabilityShapes) != 1.0:
     sys.exit('Vector "probabilityShapes" indicating the probability of occurrence of bubble shapes has not been defined correctly.')
    
 
-def bubbleShape(C_ID, C_t, timeInterval, shapeID, mgb, mg_StillRequired):
+def bubbleShape(C_ID, C_t, timeInterval, shapeID, mgb, mgb_min, mgb_max, mg_StillRequired):
     global UVal, VOFwVal # define UVal and VOFwVal to be global such that these matrices can be altered directly by this function - as coordList will not be adapted in this function, it does not need to be defined as global (Python automatically looks for coordList definition outside of function)
     UVal_temp = np.array(UVal)
     VOFwVal_temp = np.array(VOFwVal)
@@ -89,21 +92,16 @@ def bubbleShape(C_ID, C_t, timeInterval, shapeID, mgb, mg_StillRequired):
     # of the desired amount of gas mg_tunit.
     if shapeID == 0:
         rg = ((3.0*mgb)/(4.0*math.pi*rhog))**(1.0/3.0)
-        # If desired, check that the scaling factor is within acceptable range:
+        # Check that the scaling factor is within acceptable range:
         # This spherical bubble should be able to yield small bubbles required to make sure you can come within tol_mg
         # of the desired mg_tunit without overshooting it. That is why, if the required amount of gas is lower than the
         # normal minimum for the gas bubble, mgb is just set to mgb_StillRequired
-        mgbMin = 0.05*mg_tunit
-        mgbMax = 0.2*mg_tunit
-#         TrialBoolean=False
-        if mgbMin > mg_StillRequired:
-            mgbMin = 0.0
+        if mgb_min > mg_StillRequired:
+            mgb_min = 0.0
             mgb = mg_StillRequired
-#             print("adapted mgbMin")
-#             TrialBoolean=True
-        if mgb < mgbMin:
+        if mgb < mgb_min:
             return False, 0.0
-        elif mgb > mgbMax:
+        elif mgb > mgb_max:
             return False, 0.0
         # If desired, check that the center point denoted by C_ID and C_t follows a certain set of requirements
         C_checked = True
@@ -185,7 +183,7 @@ for t in np.arange(nIntervals):
         mg_bubble = (random.random()) * (mg_tunit - mg_defined)  # randomly select a scale factor for the bubble you are creating
         #         print("Still needed: "+str(mg_tunit-mg_defined))
 #         print("Proposed: "+str(mg_bubble))
-        bubbleDefined, mg_checked = bubbleShape(C_ID, C_t, t, shapeID, mg_bubble, mg_tunit-mg_defined)
+        bubbleDefined, mg_checked = bubbleShape(C_ID, C_t, t, shapeID, mg_bubble, mgb_min, mgb_max, mg_tunit-mg_defined)
         if bubbleDefined:
             mg_defined = mg_defined+mg_checked
             iter = 0
@@ -195,7 +193,7 @@ for t in np.arange(nIntervals):
             sys.exit("Forced exit: 1000 trials of bubble definition have failed; system is ill-defined.")
     print("Time interval " + str(t) + " has been defined: "+str(mg_defined)+"kg of gas was inserted. (desired: "+str(mg_tunit)+"kg).")
 print("Inlet was modelled successfully. \n")     
-       
+
 # Writing the profile to be used in OpenFOAM
 print("Saving inlet profile to Python (numpy) npy-files.")
 np.save(casePath+'/inletDefinition-U.npy', UVal) # Matrix containing 'coordList' rows (#cell centers) and 'timeVal' columns (# time steps defined) - value of velocity
