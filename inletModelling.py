@@ -179,6 +179,7 @@ for t in np.arange(nIntervals):
         if bubbleDefined:
             mg_defined += mg_checked
             iter = 0
+            print(f'\t{mg_defined:.10f} of {mg_tunit} defined.')
         else:
             iter = iter+1
         if iter > 1000:
