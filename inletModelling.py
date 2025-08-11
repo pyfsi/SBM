@@ -76,7 +76,7 @@ if np.sum(probabilityShapes) != 1.0:
     sys.exit('Vector "probabilityShapes" indicating the probability of occurrence of bubble shapes has not been defined correctly.')
    
 
-def bubbleShape(C_ID, C_t, timeInterval, shapeID, mgb, mgb_min, mgb_max, mg_StillRequired):
+def bubbleShape(C_ID, C_t, timeInterval, shapeID, mgb):
     global UVal, VOFwVal # define UVal and VOFwVal to be global such that these matrices can be altered directly by this function - as coordList will not be adapted in this function, it does not need to be defined as global (Python automatically looks for coordList definition outside of function)
     UVal_temp = np.array(UVal)
     VOFwVal_temp = np.array(VOFwVal)
@@ -92,17 +92,7 @@ def bubbleShape(C_ID, C_t, timeInterval, shapeID, mgb, mgb_min, mgb_max, mg_Stil
     # of the desired amount of gas mg_tunit.
     if shapeID == 0:
         rg = ((3.0*mgb)/(4.0*math.pi*rhog))**(1.0/3.0)
-        # Check that the scaling factor is within acceptable range:
-        # This spherical bubble should be able to yield small bubbles required to make sure you can come within tol_mg
-        # of the desired mg_tunit without overshooting it. That is why, if the required amount of gas is lower than the
-        # normal minimum for the gas bubble, mgb is just set to mgb_StillRequired
-        if mgb_min > mg_StillRequired:
-            mgb_min = 0.0
-            mgb = mg_StillRequired
-        if mgb < mgb_min:
-            return False, 0.0
-        elif mgb > mgb_max:
-            return False, 0.0
+
         # If desired, check that the center point denoted by C_ID and C_t follows a certain set of requirements
         C_checked = True
         timeLoc = C_time-startTime-int((C_time-startTime)/tunit)*tunit  # how many seconds compared to start t_unit
@@ -178,15 +168,18 @@ for t in np.arange(nIntervals):
     mg_defined = 0.0  # Variable checking the amount of gas already defined
     while (mg_tunit-mg_defined) > (tol_mg):
         shapeID = random.randint(0, Nshapes - 1)  # randomly select bubble shape
-        C_ID = random.randint(0, len(coordList) - 1)  # randomly select centerpoint location - determined by cell center ID (2D determined)
-        C_t = random.randint(t * int(tunit / timeStepSize), (t + 1) * int(tunit / timeStepSize) - 1)  # randomly select centerpoint time location - determined by time step index in timeVal (1D determined)
-        mg_bubble = (random.random()) * (mg_tunit - mg_defined)  # randomly select a scale factor for the bubble you are creating
-        #         print("Still needed: "+str(mg_tunit-mg_defined))
-#         print("Proposed: "+str(mg_bubble))
-        bubbleDefined, mg_checked = bubbleShape(C_ID, C_t, t, shapeID, mg_bubble, mgb_min, mgb_max, mg_tunit-mg_defined)
+        # randomly select centerpoint location - determined by cell center ID (2D determined)
+        C_ID = random.randint(0, len(coordList) - 1)
+        # randomly select centerpoint time location - determined by time step index in timeVal (1D determined)
+        C_t = random.randint(t * int(tunit / timeStepSize), (t + 1) * int(tunit / timeStepSize) - 1)
+        # randomly select a scale factor for the bubble you are creating
+        mg_bubble = random.uniform(min((mgb_min, mg_tunit - mg_defined)), min((mgb_max, mg_tunit - mg_defined)))
+
+        bubbleDefined, mg_checked = bubbleShape(C_ID, C_t, t, shapeID, mg_bubble)
         if bubbleDefined:
-            mg_defined = mg_defined+mg_checked
+            mg_defined += mg_checked
             iter = 0
+            print(f'\t{mg_defined:.10f} of {mg_tunit} defined.')
         else:
             iter = iter+1
         if iter > 1000:

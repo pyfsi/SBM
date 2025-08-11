@@ -8,7 +8,7 @@ import multiprocessing
 # Read input from bash-script
 if len(sys.argv) != 7:
     sys.exit("6 arguments should be used: dimensions - case path - case name - start time step - inlet boundary name"
-             "- cores.")
+             " - cores.")
 dimensions = int(sys.argv[1])
 case_path = Path(sys.argv[2])
 case_name = str(sys.argv[3])
