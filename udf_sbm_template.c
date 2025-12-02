@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <prf.h>
 
-/* dynamic memory allocation for 1D and 2D arrays */
+/* Dynamic memory allocation for 1D and 2D arrays */
 #define DECLARE_MEMORY(name, type) type *name = NULL
 
 #define DECLARE_MEMORY_N(name, type, dim) type *name[dim] = {NULL}
@@ -40,7 +40,7 @@ for (_d = 0; _d < dim; _d++) {                                      \
     ASSIGN_MEMORY(name[_d], size, type);                            \
 }
 
-/* sending and receiving arrays in parallel */
+/* Sending and receiving arrays in parallel */
 #define PRF_CSEND_INT_N(to, name, n, tag, dim)                      \
 for (_d = 0; _d < dim; _d++) {                                      \
     PRF_CSEND_INT(to, name[_d], n, tag);                            \
@@ -61,7 +61,7 @@ for (_d = 0; _d < dim; _d++) {                                      \
     PRF_CRECV_REAL(from, name[_d], n, tag);                         \
 }
 
-/* global variables */
+/* Global variables */
 #define mnpf |MAX_NODES_PER_FACE| /* max nodes per face (substituted) */
 #define n_time_steps |N_TIME_STEPS| /* number of time steps (substituted) */
 #define time_step_start |TIME_STEP_START| /* start time step (substituted) */
@@ -79,7 +79,7 @@ bool data_loaded = false;
 /*----------------------*/
 
 DEFINE_ON_DEMAND(get_inlet_thread_ids) {
-    /* read in thread thread ids, should be called early on */
+    /* Read thread ids, should be called early on */
     if (myid == 0) {printf("\n\nStarted UDF get_inlet_thread_ids.\n"); fflush(stdout);}
 
 #if RP_HOST
@@ -162,8 +162,8 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
         begin_f_loop(face, face_thread) {
             if (i_f >= n_faces) {Error("\nUDF-error: Index %i >= array size %i.", i_f, n_faces);}
 
-            F_CENTROID(centroid, face, face_thread); /*centroid of face returned from F_CENTROID */
-            F_AREA(area,face,face_thread); /* face normal vector returned from F_AREA */
+            F_CENTROID(centroid, face, face_thread); /* Centroid of face returned from F_CENTROID */
+            F_AREA(area,face,face_thread); /* Face normal vector returned from F_AREA */
 
             for (d = 0; d < ND_ND; d++) {
                 face_coords[d][i_f] = centroid[d];
@@ -185,7 +185,7 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
             i_f++;
         } end_f_loop(face, face_thread);
 
-        /* information either sent from nodes to node 0 or from node 0 to host */
+        /* Information either sent from nodes to node0 or from node0 to host */
         receiving_node = (I_AM_NODE_ZERO_P) ? node_host : node_zero;
 
         PRF_CSEND_INT(receiving_node, &n_faces, 1, myid);
@@ -199,7 +199,7 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
         RELEASE_MEMORY_N(face_ids, mnpf);
 
         if(I_AM_NODE_ZERO_P){
-            compute_node_loop_not_zero(sending_node) { /* node 0 receives from other nodes and passes on to host */
+            compute_node_loop_not_zero(sending_node) { /* node0 receives from other nodes and passes on to host */
                 PRF_CRECV_INT(sending_node, &n_faces, 1, sending_node);
 
                 ASSIGN_MEMORY_N(face_coords, n_faces, real, ND_ND);
@@ -210,7 +210,7 @@ DEFINE_ON_DEMAND(store_faces_normals_ids) {
                 PRF_CRECV_REAL_N(sending_node, face_areas, n_faces, sending_node, ND_ND);
                 PRF_CRECV_INT_N(sending_node, face_ids, n_faces, sending_node, mnpf);
 
-                /* Node 0 passes on messages from sending nodes to host node */
+                /* node0 passes on messages from sending nodes to host node */
                 PRF_CSEND_INT(node_host, &n_faces, 1, sending_node);
 
                 PRF_CSEND_REAL_N(node_host, face_coords, n_faces, sending_node, ND_ND);
@@ -272,7 +272,7 @@ DEFINE_ON_DEMAND(read_vof_face_ids) {
 
 #if RP_NODE
     int receiving_node;
-#endif /*RP_NODE*/
+#endif /* RP_NODE */
 
 #if RP_HOST
     int i, j;
@@ -307,7 +307,7 @@ DEFINE_ON_DEMAND(read_vof_face_ids) {
     fclose(fp_ids);
     fclose(fp_vof);
 
-#endif /*RP_HOST*/
+#endif /* RP_HOST */
 
     /* Send data to nodes */
     host_to_node_int_1(n_faces);
@@ -315,7 +315,7 @@ DEFINE_ON_DEMAND(read_vof_face_ids) {
 #if RP_HOST
     PRF_CSEND_INT_N(node_zero, ids, n_faces, myid, mnpf); /* send from host to node0 */
     PRF_CSEND_INT_N(node_zero, vof_w, n_faces, myid, n_time_steps); /* send from host to node0 */
-#endif /*RP_HOST*/
+#endif /* RP_HOST */
 
 #if RP_NODE
     ASSIGN_MEMORY_N(ids, n_faces, int, mnpf);
@@ -333,7 +333,7 @@ DEFINE_ON_DEMAND(read_vof_face_ids) {
         PRF_CRECV_INT_N(node_zero, ids, n_faces, node_zero, mnpf);
         PRF_CRECV_INT_N(node_zero, vof_w, n_faces, node_zero, n_time_steps);
     }
-#endif /*RP_NODE*/
+#endif /* RP_NODE */
 
     data_loaded = true;
     if (myid == 0) {printf("\nFinished UDF read_vof_face_ids.\n"); fflush(stdout);}
@@ -360,16 +360,16 @@ DEFINE_PROFILE(sbm_profile, face_thread, alpha){
         {
             /* initialize node_ids array */
             for (i_n=0; i_n<mnpf; i_n++)
-                node_ids[i_n] = -1; /* if not all cells same number of nodes, fill with -1*/
+                node_ids[i_n] = -1; /* if not all cells same number of nodes, fill with -1 */
             i_n = 0;
 
             /* store node ids in node_ids array*/
             f_node_loop(face, face_thread, node_number) {
                 node = F_NODE(face, face_thread, node_number);
-                node_ids[i_n++] = NODE_DM_ID(node); /* store ID and post-increment iterator*/
+                node_ids[i_n++] = NODE_DM_ID(node); /* store ID and post-increment iterator */
             }
 
-            /*compare ids to file to find correct line (assumed different order) */
+            /* compare ids to file to find correct line (assumed different order) */
             for (i_f=i_f_min; i_f<n_faces; i_f++) {
                 all_matched = true;
                 i_n = 0;
@@ -383,7 +383,7 @@ DEFINE_PROFILE(sbm_profile, face_thread, alpha){
                         all_matched = false;
                     }
                     else {
-                    i_n++;
+						i_n++;
                     }
                 }
                 if (all_matched) {
@@ -393,7 +393,7 @@ DEFINE_PROFILE(sbm_profile, face_thread, alpha){
             }
             if (!all_matched){
                 for (j=0; j<mnpf; j++){
-                index += sprintf(&node_ids_str[index], "%i ", node_ids[j]);
+					index += sprintf(&node_ids_str[index], "%i ", node_ids[j]);
                 }
                 printf("Error on Node %i: no match found for face %s\n", myid, node_ids_str); fflush(stdout);
                 index = 0;
