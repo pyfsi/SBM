@@ -12,11 +12,13 @@ import sys
 import os  # to be able to run Linux terminal commands
 
 # Read input from bash-script
-if len(sys.argv) != 4:
-    sys.exit("3 arguments should be used: case path - folder of first timestep - inlet boundary name.")
+if len(sys.argv) != 5:
+    sys.exit("4 arguments should be used: case path - folder of first timestep - inlet boundary name - fluid name.")
 casePath = str(sys.argv[1])
 firstTimeStep = str(sys.argv[2])
 inletName = str(sys.argv[3])
+fluidName = str(sys.argv[4])
+alpha_name = "alpha."+fluidName
 
 
 # Separate function definitions
@@ -56,7 +58,7 @@ def writeFooter(fileLoc):
 print("Reading defined inlet from Python-files")
 UVal = np.load(casePath+'/inletDefinition-U.npy') # Matrix containing 'coordList' rows (#cell centers) and 'timeVal' columns (# time steps defined) - value of velocity
 VOFwVal = np.load(casePath+'/inletDefinition-VOFw.npy') # Matrix containing 'coordList' rows (#cell centers) and 'timeVal' columns (# time steps defined) - value of VOFw
-timeVal = np.load(casePath+'/inletDefinition-time.npy') # List containing the time instants where U and alpha.water are defined
+timeVal = np.load(casePath+'/inletDefinition-time.npy') # List containing the time instants where U and alpha are defined
 coordList = np.load(casePath+'/inletPython.npy')
 print("Finished reading Python-files. \n")
  
@@ -81,39 +83,43 @@ print("Finished reading Python-files. \n")
 # This code writes the inlet values assuming the boundary condition 'timeVaryingMappedFixedValue' is used. It is first checked whether this BC is indeed used. Otherwise, the script returns an error.
 # Also, it is checked whether an averaging operation ('setAverage    true;' in OF) is defined - if so, another error is returned.
 print("Checking inlet definition in folder " + firstTimeStep + ".")
-# Check boundary condition for 'U'
-os.system("cd " + casePath + "; grep -nr " + inletName + " " + firstTimeStep + "/U | cut -d : -f 1 > lineNr_U" )
-lineNameNr = int(open(casePath+"/lineNr_U", 'r').readline())
-lineTypeU = lineNameNr+1  # inlet BC type is defined on this line - considering Python starts at index zero
-readTypeU = (open(casePath+"/"+firstTimeStep+"/U").readlines())[lineTypeU]
-boundaryConditionU = (readTypeU.split())[-1][0:-1]
-os.system("rm " + casePath + "/lineNr_U")
-if boundaryConditionU != "timeVaryingMappedFixedValue":
-    sys.exit("The condition for 'U' at the boundary '" + inletName + "' is not set to 'timeVaryingMappedFixedValue'. \n")
-os.system("cd " + casePath + "; grep -nr " + 'setAverage' + " " + firstTimeStep + "/U | cut -d : -f 1 > lineNr_setAvg" )
-lineNameNr = int(open(casePath+"/lineNr_setAvg", 'r').readline())-1  # Line where 'setAverage' is defined
-readSetAvg = (open(casePath+"/"+firstTimeStep+"/U").readlines())[lineNameNr]
-setAvg = (readSetAvg.split())[-1][0:-1]
-os.system("rm " + casePath + "/lineNr_setAvg")
-if setAvg != "false":
-    sys.exit("Error! The boundary condition at '" + inletName + "' defines an averaging operation for 'U'. This is not compatible with the transient inlet modelling defined in the Python script. \n")
-# Check boundary condition for 'alpha.water'
-os.system("cd " + casePath + "; grep -nr " + inletName + " " + firstTimeStep + "/alpha.water | cut -d : -f 1 > lineNr_VOFw" )
-lineNameNr = int(open(casePath+"/lineNr_VOFw", 'r').readline())
-lineTypeVOFw = lineNameNr+1 # inlet BC type is defined on this line - considering Python starts at index zero
-readTypeVOFw = (open(casePath+"/"+firstTimeStep+"/alpha.water").readlines())[lineTypeVOFw]
-boundaryConditionVOFw = (readTypeVOFw.split())[-1][0:-1]
-os.system("rm " + casePath +"/lineNr_VOFw")    
-if boundaryConditionVOFw != "timeVaryingMappedFixedValue":
-    sys.exit("The condition for 'alpha.water' at the boundary '" + inletName + "' is not set to 'timeVaryingMappedFixedValue'. \n")
-os.system("cd " + casePath + "; grep -nr " + 'setAverage' + " "+ firstTimeStep + "/alpha.water | cut -d : -f 1 > lineNr_setAvg" ) 
-lineNameNr = int(open(casePath+"/lineNr_setAvg",'r').readline())-1 #Line where 'setAverage' is defined
-readSetAvg = (open(casePath+"/"+firstTimeStep+"/alpha.water").readlines())[lineNameNr]
-setAvg = (readSetAvg.split())[-1][0:-1]
-os.system("rm " + casePath + "/lineNr_setAvg")
-if setAvg != "false":
-    sys.exit("Error! The boundary condition at '" + inletName + "' defines an averaging operation for 'alpha.water'. This is not compatible with the transient inlet modelling defined in the Python script. \n")
-print("Inlet definition in folder " + firstTimeStep + " is OK. \n")
+if False: # requires alpha and U to have a specific format. TODO make file reading more flexible
+    # Check boundary condition for 'U'
+    os.system("cd " + casePath + "; grep -nr " + inletName + " " + firstTimeStep + "/U | cut -d : -f 1 > lineNr_U" )
+    lineNameNr = int(open(casePath+"/lineNr_U", 'r').readline())
+    lineTypeU = lineNameNr+1  # inlet BC type is defined on this line - considering Python starts at index zero
+    readTypeU = (open(casePath+"/"+firstTimeStep+"/U").readlines())[lineTypeU]
+    boundaryConditionU = (readTypeU.split())[-1][0:-1]
+    os.system("rm " + casePath + "/lineNr_U")
+    if boundaryConditionU != "timeVaryingMappedFixedValue":
+        print('U has type '+readTypeU)
+        sys.exit("The condition for 'U' at the boundary '" + inletName + "' is not set to 'timeVaryingMappedFixedValue'. \n")
+    os.system("cd " + casePath + "; grep -nr " + 'setAverage' + " " + firstTimeStep + "/U | cut -d : -f 1 > lineNr_setAvg" )
+    lineNameNr = int(open(casePath+"/lineNr_setAvg", 'r').readline())-1  # Line where 'setAverage' is defined
+    readSetAvg = (open(casePath+"/"+firstTimeStep+"/U").readlines())[lineNameNr]
+    setAvg = (readSetAvg.split())[-1][0:-1]
+    os.system("rm " + casePath + "/lineNr_setAvg")
+    if setAvg != "false":
+        sys.exit("Error! The boundary condition at '" + inletName + "' defines an averaging operation for 'U'. This is not compatible with the transient inlet modelling defined in the Python script. \n")
+
+    # Check boundary condition for alpha
+    os.system("cd " + casePath + "; grep -nr " + inletName + " " + firstTimeStep + "/" + alpha_name + " | cut -d : -f 1 > lineNr_VOFw" )
+    lineNameNr = int(open(casePath+"/lineNr_VOFw", 'r').readline())
+    lineTypeVOFw = lineNameNr+1 # inlet BC type is defined on this line - considering Python starts at index zero
+    readTypeVOFw = (open(casePath + "/" + firstTimeStep + "/" + alpha_name).readlines())[lineTypeVOFw]
+    boundaryConditionVOFw = (readTypeVOFw.split())[-1][0:-1]
+    os.system("rm " + casePath +"/lineNr_VOFw")    
+    if boundaryConditionVOFw != "timeVaryingMappedFixedValue":
+        print(lineNameNr)
+        sys.exit(f"The condition for {alpha_name} at the boundary '" + inletName + "' is not set to 'timeVaryingMappedFixedValue'. \n")
+    os.system("cd " + casePath + "; grep -nr " + 'setAverage' + " "+ firstTimeStep + "/" + alpha_name + " | cut -d : -f 1 > lineNr_setAvg" ) 
+    lineNameNr = int(open(casePath+"/lineNr_setAvg",'r').readline())-1 #Line where 'setAverage' is defined
+    readSetAvg = (open(casePath+"/"+firstTimeStep+"/"+alpha_name).readlines())[lineNameNr]
+    setAvg = (readSetAvg.split())[-1][0:-1]
+    os.system("rm " + casePath + "/lineNr_setAvg")
+    if setAvg != "false":
+        sys.exit("Error! The boundary condition at '" + inletName + "' defines an averaging operation for {alpha_name}. This is not compatible with the transient inlet modelling defined in the Python script. \n")
+    print("Inlet definition in folder " + firstTimeStep + " is OK. \n")
 
 
 # Prepare OpenFOAM-directory
@@ -125,7 +131,7 @@ try:
     for i in np.arange(len(timeVal)):
         errVal += os.system("cd " + casePath + r"/constant/boundaryData/" + inletName +"; mkdir "+ str(timeVal[i]) +";")
         errVal += os.system("touch " + casePath + r"/constant/boundaryData/"+inletName+"/"+str(timeVal[i])+"/U;")
-        errVal += os.system("touch " + casePath + r"/constant/boundaryData/"+inletName+"/"+str(timeVal[i])+"/alpha.water;")
+        errVal += os.system("touch " + casePath + r"/constant/boundaryData/"+inletName+"/"+str(timeVal[i])+"/"+alpha_name+";")
     if errVal > 0:
         sys.exit("The Python code encountered a problem preparing the OpenFOAM-directory. Make sure that the 'constant' directory exists but does not contain a folder 'boundaryData'.")
 except: 
@@ -141,7 +147,7 @@ for i in np.arange(len(timeVal)):
     # Set location of files
     fileLoc_points = casePath + r"/constant/boundaryData/" + inletName + "/points"
     fileLoc_U = casePath + r"/constant/boundaryData/" + inletName + "/" + str(timeVal[i]) + "/U"
-    fileLoc_VOFw = casePath + r"/constant/boundaryData/" + inletName + "/" + str(timeVal[i]) + "/alpha.water"
+    fileLoc_VOFw = casePath + r"/constant/boundaryData/" + inletName + "/" + str(timeVal[i]) + "/" + alpha_name
     # Write OpenFOAM-header
     writeHeader(fileLoc_points, "vectorField", "points")
     writeHeader(fileLoc_U, "vectorAverageField", "values")
@@ -156,18 +162,26 @@ for i in np.arange(len(timeVal)):
     f.close() 
     # Write 'U'-file
     f=open(fileLoc_U,'a+')
-    f.write('//Average'+'\n')
-    f.write('(0 0 0)'+'\n'+'\n')  # necessary for vectorAverageField, but not used if 'setAverage' is set to false (checked earlier in this script)
+    
+    # necessary for vectorAverageField, but not used if 'setAverage' 
+    # is set to false (checked earlier in this script) TODO
+    # f.write('//Average'+'\n')
+    # f.write('(0 0 0)'+'\n'+'\n')  
+    
     f.write('//Data points'+'\n')
     f.write(str(nPoints)+'\n'+'('+'\n')
     for j in np.arange(nPoints):
         f.write('(' + str(UVal[j, i, 0]) + ' ' + str(UVal[j, i, 1]) + ' ' + str(UVal[j, i, 2]) + ') \n')
     f.write(')'+'\n')  
     f.close() 
-    # Write 'alpha.water'-file
+    # Write alpha-file
     f = open(fileLoc_VOFw, 'a+')
-    f.write('//Average'+'\n')
-    f.write('0'+'\n'+'\n')  # necessary for vectorAverageField, but not used if 'setAverage' is set to false (checked earlier in this script)
+
+    # necessary for vectorAverageField, but not used if 'setAverage' 
+    # is set to false (checked earlier in this script) TODO
+    # f.write('//Average'+'\n')
+    # f.write('0'+'\n'+'\n')  #
+    
     f.write('//Data points'+'\n')
     f.write(str(nPoints)+'\n'+'('+'\n')
     for j in np.arange(nPoints):

@@ -21,19 +21,24 @@ startTime = str(sys.argv[4])
 inletName = str(sys.argv[5])
 
 # Read inlet boundary from OpenFOAM
-print("Starting 'writeCellCentres' module of OpenFOAM") 
-os.system("cd " + casePath + "; ml " + moduleCFD + "; source $FOAM_BASH; writeCellCentres -time " + startTime + ";")
-print("Finished 'writeCellCentres'. \n")
+print("Starting 'postProcess' module of OpenFOAM") 
+os.system("cd " + casePath + "; ml " + moduleCFD + "; source $FOAM_BASH; postProcess -time " + startTime + ";")
+print("Finished 'postProcess'. \n")
 print("Loading inlet cell coordinates and face areas into Python.")
 for i in np.arange(4):
     if i == 0:
-        sourceFile = casePath + "/" + startTime + "/ccx"
+        # sourceFile = casePath + "/" + startTime + "/ccx"
+        sourceFile = casePath + "/" + startTime + "/Cx"
     elif i == 1:
-        sourceFile = casePath + "/" + startTime + "/ccy"
+        # sourceFile = casePath + "/" + startTime + "/ccy"
+        sourceFile = casePath + "/" + startTime + "/Cy"
     elif i == 2:
-        sourceFile = casePath + "/" + startTime + "/ccz"
+        # sourceFile = casePath + "/" + startTime + "/ccz"
+        sourceFile = casePath + "/" + startTime + "/Cz"
     elif i == 3:
-        sourceFile = casePath + "/" + startTime + "/V" # In the V-file, writeCellCentres writes cell volumes for internal field and patch face areas for boundary fields like the inlet.
+        # In the V-file, writeCellCentres writes cell volumes for internal field 
+        # and patch face areas for boundary fields like the inlet.
+        sourceFile = casePath + "/" + startTime + "/area" 
     try:
         # find line where inlet-list starts; you should redo this for all coordinates as 'writeCellCentres' - when
         # possible - replaces lists of uniform values by a single uniform value statement. If the latter is the case,
@@ -41,6 +46,9 @@ for i in np.arange(4):
         # another coordinate-file (it's not possible to have >1 'uniform value' coordinate files). The incomplete
         # uniform value-files are subsequently (outside the try-loop) converted to a list of the same size as the
         # non-uniform list coordinates.
+        if not os.path.exists(sourceFile):
+            sys.exit(f"{sourceFile} not found")
+
         os.system("cd " + casePath + "; grep -nr " + inletName + " " + sourceFile + " | cut -d : -f 1 > lineNr")
         lineNameNr = int(open(casePath + "/lineNr", 'r').readline())
         lineStartNr = lineNameNr + 6  # In case of non-uniform list, this is where the list of values in the sourceFile starts
@@ -67,9 +75,11 @@ for i in np.arange(4):
         tempCoordFile = np.ones([rowsNr, 1])*float("inf")
         for j in np.arange(rowsNr):
             tempCoordFile[j, 0] = unifValue
+
     if i == 0:
         coordList = np.ones([rowsNr, 5]) * float("inf")  # ID - X - Y - Z - Area
         coordList[:, 0] = np.arange(rowsNr)
+
     coordList[:, (i + 1)] = tempCoordFile[:, 0]
 
 

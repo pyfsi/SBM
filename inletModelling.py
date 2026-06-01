@@ -43,12 +43,10 @@ if endTime <= startTime:
     sys.exit("The endTime should be larger than the startTime.")
 if (abs(int(tunit/timeStepSize) - tunit/timeStepSize) >= timeStepSize) and (abs((int(tunit/timeStepSize)+1) - tunit/timeStepSize) >= timeStepSize):
     sys.exit("Variable tunit should be a multiple of timeStepSize.")  
-    
-    
+
 # Reading the inlet geometry and normal to the inlet condition prepared with 'TubeBundle_readInlet_<CFD-programme>.py' 
 coordList = np.load(casePath + "/inletPython.npy")
 normalInlet = np.load(casePath + "/normalInletPython.npy")
-
 
 # Initializing U and VOFw
 nTimeSteps = int((endTime-startTime)/timeStepSize)+1 # Plus 1 because first time step is included - last time step is not included.
@@ -59,8 +57,7 @@ for i in np.arange(3):
     UVal[:, :, 2] = U*normalInlet[2]
 VOFwVal = np.ones([len(coordList), nTimeSteps, 1])  # initially: "pre-inlet domain" filled with water
 timeVal = np.arange(startTime, endTime, timeStepSize)  # list of flow times to be defined in this model
-    
-    
+
 # Creating bubble shapes - under the hood, so hard-coded shapes
 # Bubble shapes are defined as 1 function named "bubbleShape", comprising a switch based on the shapeID of the bubble
 # (each shape gets its own shapeID and is defined in another part of the switch)
@@ -74,10 +71,13 @@ Nshapes = 1  # hard-coded counter used to verify validity of input of "shapeID"-
 probabilityShapes = [1.0] # hard-coded probability distribution of the bubble shapes - el. 0 = probability of bubble shape 0 .... // It is checked that the sum of elements equals zero.
 if np.sum(probabilityShapes) != 1.0:
     sys.exit('Vector "probabilityShapes" indicating the probability of occurrence of bubble shapes has not been defined correctly.')
-   
 
 def bubbleShape(C_ID, C_t, timeInterval, shapeID, mgb):
-    global UVal, VOFwVal # define UVal and VOFwVal to be global such that these matrices can be altered directly by this function - as coordList will not be adapted in this function, it does not need to be defined as global (Python automatically looks for coordList definition outside of function)
+    # define UVal and VOFwVal to be global such that these matrices can be altered directly by this function 
+    # As coordList will not be adapted in this function, 
+    # it does not need to be defined as global (Python automatically looks for coordList definition outside of function)
+    global UVal, VOFwVal
+     
     UVal_temp = np.array(UVal)
     VOFwVal_temp = np.array(VOFwVal)
     C_coord = coordList[C_ID, :]
@@ -95,7 +95,10 @@ def bubbleShape(C_ID, C_t, timeInterval, shapeID, mgb):
 
         # If desired, check that the center point denoted by C_ID and C_t follows a certain set of requirements
         C_checked = True
-        timeLoc = C_time-startTime-int((C_time-startTime)/tunit)*tunit  # how many seconds compared to start t_unit
+        # print(f"C_ID = {C_ID}; C_t = {C_t} => \t {C_time} \t {startTime} \t {tunit}")
+        timeLoc = C_time - startTime - int((C_time-startTime)/tunit) * tunit  # how many seconds compared to start t_unit
+
+        # print(f"timeLoc = {timeLoc}. It should NOT be {tunit-rg/U} < timeLoc < {rg/U}")
         # Checks below prevents intersection with beginning of t_unit domain
         if timeLoc < rg/U:
             C_checked = False
@@ -103,6 +106,7 @@ def bubbleShape(C_ID, C_t, timeInterval, shapeID, mgb):
             C_checked = False
         if not(C_checked):  # Position of the bubble center (C_ID,C_t) is not OK.
             return False, 0.0
+        
         # Check for each element in the VOFwVal[:, :, 0] whether it's in the bubble to be defined and whether this
         # bubble does not intersect with a previously defined gas bubble. If no old bubble is intersected, change the
         # element VOFwVal and UVal to the appropriate-value; this will be stored in the temporary matrices which will be
@@ -110,7 +114,8 @@ def bubbleShape(C_ID, C_t, timeInterval, shapeID, mgb):
         # Concurrently, integrate the mass of gas you have introduced in the domain.
         mg_checked = 0.0
         mg_bubbleWall = 0.0
-        coordCenter = np.array([C_coord[1] - (U * C_time) * normalInlet[0], C_coord[2] - (U * C_time) * normalInlet[1],
+        coordCenter = np.array([C_coord[1] - (U * C_time) * normalInlet[0], 
+                                C_coord[2] - (U * C_time) * normalInlet[1],
                                 C_coord[3] - (U * C_time) * normalInlet[2]])
 
         i_mask = np.linalg.norm(coordList[:, 1:4] - C_coord[1:4], axis=1) < rg
@@ -120,6 +125,7 @@ def bubbleShape(C_ID, C_t, timeInterval, shapeID, mgb):
         j_max = int(math.ceil((timeLoc + rg/U)/timeStepSize)) + 1
 
         # nested loop could maybe be eliminated by vectorization: boolean arithmetic on the matrices
+        n_true_flag = 0
         for i in i_list:
             for j in range(j_min, j_max):
                 coordPoint = np.array(
@@ -133,13 +139,16 @@ def bubbleShape(C_ID, C_t, timeInterval, shapeID, mgb):
                         UVal_temp[i, timeInterval * int(tunit / timeStepSize) + j, 0] = U * normalInlet[0]
                         UVal_temp[i, timeInterval * int(tunit / timeStepSize) + j, 1] = U * normalInlet[1]
                         UVal_temp[i, timeInterval * int(tunit / timeStepSize) + j, 2] = U * normalInlet[2]
-                        mg_checked = mg_checked + coordList[i, 4] * U * timeStepSize * rhog
+                        mg_checked += coordList[i, 4] * U * timeStepSize * rhog
                         mg_bubbleWall = mg_bubbleWall + coordList[i, 4] * U * timeStepSize * rhog
+                        n_true_flag += 1
                     elif intersectBubble:
                         mg_bubbleWall = mg_bubbleWall + coordList[
                             i, 4] * U * timeStepSize * rhog  # In this case, a cell was already filled with air, but I will add the mass of air to mg_bubbleWall to be able to check later whether a wall was intersected.
                     else:
                         return False, 0.0
+        # print(f"Loop return with {n_true_flag} and mg_checked {mg_checked} !>! 0")
+                    
     # Check mass of gas added to the domain: in case intersection with boundary is not allowed (intersectBoundary=False)
     if not(intersectBoundary):
         if mg_bubbleWall < (mgb-np.average(coordList[:, 4])*U*timeStepSize):
@@ -151,6 +160,9 @@ def bubbleShape(C_ID, C_t, timeInterval, shapeID, mgb):
     # Save temporary files to permanent files
     UVal = UVal_temp
     VOFwVal = VOFwVal_temp
+
+    # print(f" \t rg={rg} \t mg_checked={mg_checked}")
+
     return True, mg_checked
            
            
@@ -164,6 +176,7 @@ nIntervals = int((endTime-startTime)/tunit)  # Number of intervals [0,tunit[
 print("Between startTime " + str(startTime) + "s and endTime " + str(endTime) + "s, " + str(
     nIntervals) + " intervals of " + str(tunit) + "s need to be defined.")
 for t in np.arange(nIntervals):
+    print(f"Start bubble calculation for time interval {t}")
     iter = 0
     mg_defined = 0.0  # Variable checking the amount of gas already defined
     while (mg_tunit-mg_defined) > (tol_mg):
@@ -179,12 +192,14 @@ for t in np.arange(nIntervals):
         if bubbleDefined:
             mg_defined += mg_checked
             iter = 0
-            print(f'\t{mg_defined:.10f} of {mg_tunit} defined.')
+            # print(f'\t{mg_defined:.10f} of {mg_tunit} defined.')
         else:
             iter = iter+1
+            temp = mg_tunit-mg_defined
+            print(f"\t mg_bubble {mg_bubble:.10f} \t Residual {temp:.10f}")
         if iter > 1000:
             sys.exit("Forced exit: 1000 trials of bubble definition have failed; system is ill-defined.")
-    print("Time interval " + str(t) + " has been defined: "+str(mg_defined)+"kg of gas was inserted. (desired: "+str(mg_tunit)+"kg).")
+    print("\t => Time interval " + str(t) + " has been defined: "+str(mg_defined)+"kg of gas was inserted. (desired: "+str(mg_tunit)+"kg).")
 print("Inlet was modelled successfully. \n")     
 
 # Writing the profile to be used in OpenFOAM

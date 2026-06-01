@@ -7,36 +7,42 @@
 # shapes are defined in "InletModelling.py".
 
 # User input 
-export CFD_PROGRAMME=ANSYS_CFD
-export CFD_VERSION=2023R1 # Version of the CFD-solver (module name= CFD_PROGRAMME/CFD_VERSION)
-export PYTHON_VERSION=Anaconda3-python/2022.10
+export CFD_PROGRAMME=OpenFOAM # OpenFOAM or ANSYS_CFD
+export CFD_VERSION=v2312-foss-2023a # OpenFOAM/v2406-foss-2023a Version of the CFD-solver (module name= CFD_PROGRAMME/CFD_VERSION)
+export PYTHON_VERSION=Anaconda3-python/2023.09-0 #Anaconda3-python/2022.10
 export DIM=3 # Number of geometrical dimensions of the case (either 2 or 3)
-export CASE_PATH=~/GO-VIKING/Box_2 # Location of base case
+export CASE_PATH=/cfdfile1/data/fm/radiputr/Documents/02_Simulation/SBM/sbm_unit_test_temp # Location of base case
 export startTime=0 # First flow time to be defined
-export endTime=5 # Last flow time to be defined
-export timeStepSize=0.0001 # Time step size to be used in following calculation
-export tunit=1 # Unit time scale - parameter for inlet modelling
+export endTime=1 # Last flow time to be defined
+export timeStepSize=0.001 # Time step size to be used in following calculation
+export tunit=0.1 # Unit time scale - parameter for inlet modelling. TIME INTERVAL FOR BUBBLE INSERTION
 export inletName=inlet # Name of the inlet boundary to be modelled
 export rhog=1.225 # Density of the gas
 export rhol=998.2 # Density of the liquid
-export mg=0.214375 # Amount of the gas to be introduced in domain over a time 'tunit'
-export mgb_min=0.010719 # 5% of mg
-export mgb_max=0.042875 # 20 % of mg
-export tol_mg=1e-05 # Tolerance on the amount of gas to be introduced in domain over a time 'tunit'
+export mg=5e-6 # Amount of the gas to be introduced in domain over a time 'tunit'
+export mgb_min=5e-7 # 10% of mg USED ONLY IN INLETMODELLING
+export mgb_max=1e-6 # 20% of mg USED ONLY IN INLETMODELLING
+export tol_mg=1e-7 # Tolerance on the amount of gas to be introduced in domain over a time 'tunit'
 export U=1 # Velocity of the mixture  to be introduced in domain
 export intersectBoundary=True # Boolean indicating whether bubbles may intersect domain boundaries
-export intersectBubble=False # Boolean indicating whether new bubble may intersect previously defined bubbles
+export intersectBubble=True # Boolean indicating whether new bubble may intersect previously defined bubbles
 export mnpf=4 # max nodes per face (Fluent)
 export time_step_start=0 # start_time_step (Fluent)
 export n_time_steps=50000 # number of time steps (Fluent)
 export case_name=second_test.cas.h5 # name of case file (Fluent)
 export CORES=4 # number of cores to be used
+export fluid_name=Water
 
 # Load Python (inlet modelling performed in Python Anaconda)
 module load $PYTHON_VERSION
 
 # Execution of the script depends on CFD-programme to be used
 export CFD_MODULE=$CFD_PROGRAMME/$CFD_VERSION
+
+# remove old boundary data TODO delete this
+export OLD_BOUNDARY_DATA=$CASE_PATH/constant/boundaryData
+rm -rf $OLD_BOUNDARY_DATA
+
 # Read the inlet geometry: This script is designed to be case-dependent
 if [ "$CFD_PROGRAMME" = "OpenFOAM" ]
 then
@@ -56,7 +62,7 @@ python inletModelling.py $CASE_PATH $startTime $endTime $timeStepSize $tunit $in
 if [ "$CFD_PROGRAMME" = "OpenFOAM" ]
 then
 # Write the inlet boundary condition with Python-script
-	python writeBC_OpenFOAM.py $CASE_PATH $startTime $inletName
+	python writeBC_OpenFOAM.py $CASE_PATH $startTime $inletName $fluid_name
 elif [ "$CFD_PROGRAMME" = "ANSYS_CFD" ]
 then
   python write_bc_fluent.py $DIM $CASE_PATH $case_name $time_step_start $inletName $CORES
