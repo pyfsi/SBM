@@ -1,0 +1,86 @@
+solid Box001
+ facet normal -1.0 0.0 0.0
+  outer loop
+   vertex -0.005 -0.005 0.04
+   vertex -0.005 -0.005 0.05
+   vertex -0.005 0.015 0.04
+  endloop
+ endfacet
+ facet normal -1.0 0.0 0.0
+  outer loop
+   vertex -0.005 0.015 0.04
+   vertex -0.005 -0.005 0.05
+   vertex -0.005 0.015 0.05
+  endloop
+ endfacet
+ facet normal 1.0 0.0 0.0
+  outer loop
+   vertex 0.015 -0.005 0.05
+   vertex 0.015 -0.005 0.04
+   vertex 0.015 0.015 0.04
+  endloop
+ endfacet
+ facet normal 1.0 -0.0 0.0
+  outer loop
+   vertex 0.015 -0.005 0.05
+   vertex 0.015 0.015 0.04
+   vertex 0.015 0.015 0.05
+  endloop
+ endfacet
+ facet normal 0.0 -1.0 0.0
+  outer loop
+   vertex 0.015 -0.005 0.04
+   vertex 0.015 -0.005 0.05
+   vertex -0.005 -0.005 0.04
+  endloop
+ endfacet
+ facet normal 0.0 -1.0 0.0
+  outer loop
+   vertex -0.005 -0.005 0.04
+   vertex 0.015 -0.005 0.05
+   vertex -0.005 -0.005 0.05
+  endloop
+ endfacet
+ facet normal 0.0 1.0 0.0
+  outer loop
+   vertex 0.015 0.015 0.05
+   vertex 0.015 0.015 0.04
+   vertex -0.005 0.015 0.04
+  endloop
+ endfacet
+ facet normal 0.0 1.0 0.0
+  outer loop
+   vertex 0.015 0.015 0.05
+   vertex -0.005 0.015 0.04
+   vertex -0.005 0.015 0.05
+  endloop
+ endfacet
+ facet normal 0.0 0.0 -1.0
+  outer loop
+   vertex -0.005 0.015 0.04
+   vertex 0.015 0.015 0.04
+   vertex -0.005 -0.005 0.04
+  endloop
+ endfacet
+ facet normal 0.0 0.0 -1.0
+  outer loop
+   vertex -0.005 -0.005 0.04
+   vertex 0.015 0.015 0.04
+   vertex 0.015 -0.005 0.04
+  endloop
+ endfacet
+ facet normal 0.0 0.0 1.0
+  outer loop
+   vertex 0.015 0.015 0.05
+   vertex -0.005 0.015 0.05
+   vertex -0.005 -0.005 0.05
+  endloop
+ endfacet
+ facet normal 0.0 0.0 1.0
+  outer loop
+   vertex 0.015 0.015 0.05
+   vertex -0.005 -0.005 0.05
+   vertex 0.015 -0.005 0.05
+  endloop
+ endfacet
+endsolid Box001

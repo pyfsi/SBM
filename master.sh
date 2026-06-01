@@ -11,9 +11,9 @@ export CFD_PROGRAMME=OpenFOAM # OpenFOAM or ANSYS_CFD
 export CFD_VERSION=v2312-foss-2023a # OpenFOAM/v2406-foss-2023a Version of the CFD-solver (module name= CFD_PROGRAMME/CFD_VERSION)
 export PYTHON_VERSION=Anaconda3-python/2023.09-0 #Anaconda3-python/2022.10
 export DIM=3 # Number of geometrical dimensions of the case (either 2 or 3)
-export CASE_PATH=/cfdfile1/data/fm/radiputr/Documents/02_Simulation/SBM/sbm_unit_test_temp # Location of base case
+export CASE_PATH=/cfdfile1/data/fm/radiputr/Documents/02_Simulation/SBM/sbm_unit_test # Location of base case
 export startTime=0 # First flow time to be defined
-export endTime=1 # Last flow time to be defined
+export endTime=0.1 # Last flow time to be defined
 export timeStepSize=0.001 # Time step size to be used in following calculation
 export tunit=0.1 # Unit time scale - parameter for inlet modelling. TIME INTERVAL FOR BUBBLE INSERTION
 export inletName=inlet # Name of the inlet boundary to be modelled
