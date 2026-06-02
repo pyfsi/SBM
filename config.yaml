@@ -1,0 +1,29 @@
+case_path:  /cfdfile1/data/fm/radiputr/Documents/02_Simulation/SBM/sbm_unit_test
+packages:
+  cfd_program:  OpenFOAM
+  cfd_version:  v2312-foss-2023a
+  python_version: Anaconda3-python/2023.09-0
+simulation_parameters:
+  dimension:  3
+  start_time: 0
+  end_time: 0.5
+  delta_time: 0.001 # <timeStepSize>
+  inlet_name: inlet # case sensitive
+  fluid_name: Water # case sensitive
+  rho_g:  1.225
+  rho_l:  998.2
+sbm_parameters:
+  t_unit: 0.1
+  mass_bubble: 5e-6 # orig: mg
+  mass_bubble_min:  5e-7  # <mgb_min> 10% of mg USED ONLY IN INLETMODELLING
+  mass_bubble_max:  1e-6  # <mgb_max> 20% of mg USED ONLY IN INLETMODELLING
+  mass_bubble_tol:  1e-7  # <tol_mg> Tolerance on the amount of gas to be introduced in domain over a time 'tunit'
+  velocity:         1     # <U> Velocity of the mixture  to be introduced in domain
+  intersect_boundary: True
+  intersect_bubble: True
+fluent:
+  max_nodes_per_face: 4   # <mnpf>
+  time_step_start: 0
+  n_time_steps: 50000
+  case_name:  second_test.cas.h5
+  cores:  4 

@@ -10,32 +10,28 @@ import math
 import numpy as np
 import sys
 import random  # package with random generator
+import yaml
 
 print("Starting inlet modelling script.\n")
 
-# Read input from bash-script
-if len(sys.argv) != 16:
-    sys.exit(
-        "15 arguments should be used: case path - start time - end time - time step size - unit time - inlet name - "
-        "gas density - liquid density - gas mass per tunit -tolerance on gas mass to be inserted per tunit- velocity - "
-        "a boolean indicating whether prescribed bubbles may intersect with domain boundaries - a boolean indicating "
-        "whether prescribed bubbles may interest with previously defined bubbles - the minimal mass per bubble - the "
-        "maximal mass per bubble. ")
-casePath = str(sys.argv[1])
-startTime = float(sys.argv[2])
-endTime = float(sys.argv[3])
-timeStepSize = float(sys.argv[4])  # Determines the rate at which the new inlet will be saved in Python.
-tunit = float(sys.argv[5])
-inletName = str(sys.argv[6])
-rhog = float(sys.argv[7])
-rhol = float(sys.argv[8])
-mg_tunit = float(sys.argv[9])
-tol_mg = float(sys.argv[10])
-U = float(sys.argv[11])
-intersectBoundary = str(sys.argv[12])
-intersectBubble = str(sys.argv[13])
-mgb_min = float(sys.argv[14])
-mgb_max = float(sys.argv[15])
+# Read configuration file
+with open("config.yaml", "r") as f:
+    config = yaml.load(f, Loader=yaml.SafeLoader)
+casePath = config["case_path"]
+startTime = float(config["simulation_parameters"]["start_time"])
+endTime = float(config["simulation_parameters"]["end_time"])
+timeStepSize = float(config["simulation_parameters"]["delta_time"])
+tunit = float(config["sbm_parameters"]["t_unit"])
+inletName = config["simulation_parameters"]["inlet_name"]
+rhog = float(config["simulation_parameters"]["rho_g"])
+rhol = float(config["simulation_parameters"]["rho_l"])
+mg_tunit = float(config["sbm_parameters"]["mass_bubble"])
+tol_mg = float(config["sbm_parameters"]["mass_bubble_tol"])
+U = float(config["sbm_parameters"]["velocity"])
+mgb_min = float(config["sbm_parameters"]["mass_bubble_min"])
+mgb_max = float(config["sbm_parameters"]["mass_bubble_max"])
+intersectBoundary = config["sbm_parameters"]["intersect_boundary"]
+intersectBubble = config["sbm_parameters"]["intersect_bubble"]
 
 if int((endTime-startTime)/tunit) != ((endTime-startTime)/tunit):
     sys.exit("The desired time interval (endTime - startTime) should be a multiple of tunit.")
@@ -57,6 +53,7 @@ for i in np.arange(3):
     UVal[:, :, 2] = U*normalInlet[2]
 VOFwVal = np.ones([len(coordList), nTimeSteps, 1])  # initially: "pre-inlet domain" filled with water
 timeVal = np.arange(startTime, endTime, timeStepSize)  # list of flow times to be defined in this model
+
 
 # Creating bubble shapes - under the hood, so hard-coded shapes
 # Bubble shapes are defined as 1 function named "bubbleShape", comprising a switch based on the shapeID of the bubble
@@ -95,10 +92,8 @@ def bubbleShape(C_ID, C_t, timeInterval, shapeID, mgb):
 
         # If desired, check that the center point denoted by C_ID and C_t follows a certain set of requirements
         C_checked = True
-        # print(f"C_ID = {C_ID}; C_t = {C_t} => \t {C_time} \t {startTime} \t {tunit}")
         timeLoc = C_time - startTime - int((C_time-startTime)/tunit) * tunit  # how many seconds compared to start t_unit
 
-        # print(f"timeLoc = {timeLoc}. It should NOT be {tunit-rg/U} < timeLoc < {rg/U}")
         # Checks below prevents intersection with beginning of t_unit domain
         if timeLoc < rg/U:
             C_checked = False
@@ -123,7 +118,7 @@ def bubbleShape(C_ID, C_t, timeInterval, shapeID, mgb):
 
         j_min = int((timeLoc - rg/U)/timeStepSize)
         j_max = int(math.ceil((timeLoc + rg/U)/timeStepSize)) + 1
-
+        
         # nested loop could maybe be eliminated by vectorization: boolean arithmetic on the matrices
         n_true_flag = 0
         for i in i_list:
@@ -147,7 +142,6 @@ def bubbleShape(C_ID, C_t, timeInterval, shapeID, mgb):
                             i, 4] * U * timeStepSize * rhog  # In this case, a cell was already filled with air, but I will add the mass of air to mg_bubbleWall to be able to check later whether a wall was intersected.
                     else:
                         return False, 0.0
-        # print(f"Loop return with {n_true_flag} and mg_checked {mg_checked} !>! 0")
                     
     # Check mass of gas added to the domain: in case intersection with boundary is not allowed (intersectBoundary=False)
     if not(intersectBoundary):
@@ -160,8 +154,6 @@ def bubbleShape(C_ID, C_t, timeInterval, shapeID, mgb):
     # Save temporary files to permanent files
     UVal = UVal_temp
     VOFwVal = VOFwVal_temp
-
-    # print(f" \t rg={rg} \t mg_checked={mg_checked}")
 
     return True, mg_checked
            
@@ -192,7 +184,6 @@ for t in np.arange(nIntervals):
         if bubbleDefined:
             mg_defined += mg_checked
             iter = 0
-            # print(f'\t{mg_defined:.10f} of {mg_tunit} defined.')
         else:
             iter = iter+1
             temp = mg_tunit-mg_defined

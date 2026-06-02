@@ -8,17 +8,17 @@ import numpy as np
 import sys
 import os  # to be able to run Linux terminal commands
 import linecache  # read specific line (with known index) from file
- 
- 
-# Read input from bash-script
-if len(sys.argv) != 6:
-    sys.exit("5 arguments should be used: dimensions - case path - module of the CFD solver - folder of first timestep "
-             "- inlet boundary name.  ")
-dimensions = str(sys.argv[1])
-casePath = str(sys.argv[2])
-moduleCFD = str(sys.argv[3])
-startTime = str(sys.argv[4])
-inletName = str(sys.argv[5])
+import yaml
+
+# Read configuration file
+with open("config.yaml", "r") as f:
+    config = yaml.load(f, Loader=yaml.SafeLoader)
+dimesion = config["simulation_parameters"]["dimension"]
+casePath = config["case_path"]
+moduleCFD = config["packages"]["cfd_program"] + "/" + config["packages"]["cfd_version"]
+startTime = str(config["simulation_parameters"]["start_time"])
+inletName = config["simulation_parameters"]["inlet_name"]
+
 
 # Read inlet boundary from OpenFOAM
 print("Starting 'postProcess' module of OpenFOAM") 
@@ -28,17 +28,17 @@ print("Loading inlet cell coordinates and face areas into Python.")
 for i in np.arange(4):
     if i == 0:
         # sourceFile = casePath + "/" + startTime + "/ccx"
-        sourceFile = casePath + "/" + startTime + "/Cx"
+        sourceFile = f"{casePath}/{startTime}/Cx"
     elif i == 1:
         # sourceFile = casePath + "/" + startTime + "/ccy"
-        sourceFile = casePath + "/" + startTime + "/Cy"
+        sourceFile = f"{casePath}/{startTime}/Cy"
     elif i == 2:
         # sourceFile = casePath + "/" + startTime + "/ccz"
-        sourceFile = casePath + "/" + startTime + "/Cz"
+        sourceFile = f"{casePath}/{startTime}/Cz"
     elif i == 3:
         # In the V-file, writeCellCentres writes cell volumes for internal field 
         # and patch face areas for boundary fields like the inlet.
-        sourceFile = casePath + "/" + startTime + "/area" 
+        sourceFile = f"{casePath}/{startTime}/area" 
     try:
         # find line where inlet-list starts; you should redo this for all coordinates as 'writeCellCentres' - when
         # possible - replaces lists of uniform values by a single uniform value statement. If the latter is the case,
@@ -98,7 +98,7 @@ print("Completed loading of cell coordinates and face areas into Python. \n")
 # Determine the normal pointing of the inlet, pointing INTO the domain
 # For this purpose, find three linearly independent points in coordList
 print("Calculating normal to the inlet. ")
-if dimensions == "3":
+if dimesion == 3:
     tol_product = 0.01
     point1 = coordList[0, 1:4]
     point2 = coordList[1, 1:4]
@@ -126,7 +126,7 @@ if dimensions == "3":
     if np.dot(pointDomain-point1, normalInlet) < 0:
         normalInlet = (-1.0)*normalInlet
     f.close()
-elif dimensions == "2":
+elif dimesion == 2:
     normalInlet = np.zeros([3])
     print("The normal to the inlet cannot be calculated directly. Please give the x-, y- and z-coordinates of the normal vector in the following prompts.")
     for i in np.arange(3):
@@ -140,7 +140,7 @@ elif dimensions == "2":
         normalInlet[i] = temp_coord
     normalInlet = (1/np.linalg.norm(normalInlet))*normalInlet
 else:
-    sys.exit("Number of dimensions should be either 2 or 3.")
+    sys.exit("Number of dimesion should be either 2 or 3.")
     
 print("Completed calculating normal to the inlet, pointing into the domain: " + str(normalInlet)+".  \n")
 
