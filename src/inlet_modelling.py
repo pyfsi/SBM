@@ -4,13 +4,7 @@
 # inlet model for CFD calculations. This script is called automatically by the masterscript 'TubeBundle_master.sh',
 # so the user input is channeled to this python script from the bash-script directly.
 
-
-# import of utilities
-import math
-import numpy as np
-import sys
-import random  # package with random generator
-import yaml
+from utils import np, sys, random, PI
 
 class InletModel():
     def __init__(self, UVal, VOFwVal, config):
@@ -63,7 +57,7 @@ def bubbleShape(C_ID, C_t, t, shapeID, mgb, coordList, timeVal, Nshapes, normalI
     # one bubble shape that can define a bubble sufficiently small to fall within the set tolerance tol_mg (see further)
     # of the desired amount of gas mg_tunit.
     if shapeID == 0:
-        rg = ((3.0*mgb)/(4.0*math.pi*rhog))**(1.0/3.0)
+        rg = ((3.0*mgb)/(4.0*PI*rhog))**(1.0/3.0)
 
         # If desired, check that the center point denoted by C_ID and C_t follows a certain set of requirements
         C_checked = True
@@ -92,7 +86,8 @@ def bubbleShape(C_ID, C_t, t, shapeID, mgb, coordList, timeVal, Nshapes, normalI
         i_list = i_mask.nonzero()[0]
 
         j_min = int((timeLoc - rg/U)/timeStepSize)
-        j_max = int(math.ceil((timeLoc + rg/U)/timeStepSize)) + 1
+        temp = (timeLoc + rg/U) // timeStepSize + 1
+        j_max = int(temp) + 1
         
         # nested loop could maybe be eliminated by vectorization: boolean arithmetic on the matrices
         n_true_flag = 0

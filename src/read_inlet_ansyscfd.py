@@ -1,10 +1,5 @@
 import ansys.fluent.core as pyfluent
-import sys
-from pathlib import Path
-from contextlib import redirect_stdout
-import numpy as np
-import multiprocessing
-import yaml
+from utils import np, Path, redirect_stdout, multiprocessing
 
 def read_inlet_ansyscfd(config):
     dimensions = config["simulation_parameters"]["dimension"]

@@ -3,12 +3,7 @@
 # # This script is called automatically by the masterscript 'TubeBundle_master.sh', so the user input is channeled to this python script from the bash-script directly.
 
 
-# import of utilities
-import math
-import numpy as np
-import sys
-import random # package with random generator
-
+from utils import np, sys, random, PI
 
 print("Starting inlet modelling script. \n")
 
@@ -77,7 +72,7 @@ def bubbleShape(C_ID,C_t,timeInterval,shapeID,mgb,mg_StillRequired):
     # For every bubble, you can define different requirements for the cell center location and for the scaling factor, which - if not met - causes the end of the current function call.
     # However, always make sure that you have at least one bubble shape that can define a bubble sufficiently small to fall within the set tolerance tol_mg (see further) of the desired amount of gas mg_tunit.
     if shapeID == 0:
-        rg=((3.0*mgb)/(4.0*math.pi*rhog))**(1.0/3.0)
+        rg=((3.0*mgb)/(4.0*PI*rhog))**(1.0/3.0)
         # If desired, check that the scaling factor is within acceptable range:
         # This spherical bubble should be able to yield small bubbles required to make sure you can come within tol_mg of the desired mg_tunit without overshooting it.
         # That is why, if the required amount of gas is lower than the normal minimum for the gas bubble, mgb is just set to mgb_StillRequired

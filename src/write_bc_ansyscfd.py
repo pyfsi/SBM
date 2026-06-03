@@ -1,20 +1,5 @@
 import ansys.fluent.core as pyfluent
-import sys
-from pathlib import Path
-from contextlib import redirect_stdout
-import numpy as np
-import multiprocessing
-
-# # Read input from bash-script
-# if len(sys.argv) != 7:
-#     sys.exit("6 arguments should be used: dimensions - case path - case name - start time step - inlet boundary name"
-#              " - cores.")
-# dimensions = int(sys.argv[1])
-# case_path = Path(sys.argv[2])
-# case_name = str(sys.argv[3])
-# time_step_start = int(sys.argv[4])
-# boundary_name = str(sys.argv[5])
-# cores = min(int(sys.argv[6]), multiprocessing.cpu_count())
+from utils import np, redirect_stdout, multiprocessing
 
 def write_bc_ansyscfd(config):
     dimensions = config["simulation_parameters"]["dimension"]

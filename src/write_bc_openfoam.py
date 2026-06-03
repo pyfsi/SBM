@@ -6,11 +6,7 @@
 # OpenFOAM-utility "timeVaryingMappedFixedValue" can be used. This script is called automatically by the masterscript
 # 'TubeBundle_master.sh', so the user input is channeled to this python script from the bash-script directly.
 
-# import of utilities
-import numpy as np
-import sys
-import os  # to be able to run Linux terminal commands
-import yaml
+from utils import np, sys, os
 
 #writeHeader: to write OpenFOAM-header in file at location 'fileLoc' - class and object of parameter should be given to function
 def writeHeader(fileLoc,className,objectName):
