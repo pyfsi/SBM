@@ -118,6 +118,13 @@ def write_bc_openfoam(config):
 
     # Prepare OpenFOAM-directory
     print("Creating folder 'boundaryData'.")
+    constant_path = os.path.join(casePath, "constant")
+    if not os.path.exists(constant_path):
+        raise RuntimeError("'constant' folder does not exist in the OpenFOAM case directory.")
+    boundary_data_path = os.path.join(casePath, "constant", "boundaryData")
+    if os.path.exists(boundary_data_path):
+        raise RuntimeError("'boundaryData' folder already exists.")
+
     errVal = 0  # Integer denoting whether os.system has error (>0: at least one error)
     try:
         errVal += os.system("cd " + casePath + r"/constant; mkdir boundaryData; mkdir boundaryData/"+inletName)

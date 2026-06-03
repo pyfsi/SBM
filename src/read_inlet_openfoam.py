@@ -89,12 +89,12 @@ def read_inlet_openfoam(config):
     #         head -n $((lineNr+rowsNr+5)) $sourceFile > temp
     #         tail -n $rowsNr temp > temp2
     # done
-    print("Completed loading of cell coordinates and face areas into Python. \n")
+    print("Completed loading of cell coordinates and face areas into Python.")
 
 
     # Determine the normal pointing of the inlet, pointing INTO the domain
     # For this purpose, find three linearly independent points in coordList
-    print("Calculating normal to the inlet. ")
+    print("Calculating normal to the inlet.")
     if dimesion == 3:
         tol_product = 0.01
         point1 = coordList[0, 1:4]
