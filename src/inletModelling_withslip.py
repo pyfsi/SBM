@@ -3,7 +3,7 @@
 # # This script is called automatically by the masterscript 'TubeBundle_master.sh', so the user input is channeled to this python script from the bash-script directly.
 
 
-from utils import np, sys, random, PI
+from utils import np, sys, os, random, PI, NPY_OUT_FOLDER
 
 print("Starting inlet modelling script. \n")
 
@@ -25,6 +25,8 @@ Ul=float(sys.argv[11])
 Ug=float(sys.argv[12])
 intersectBoundary=str(sys.argv[13])
 intersectBubble=str(sys.argv[14])
+output_path = os.path.join(casePath, NPY_OUT_FOLDER)
+
 
 if int((endTime-startTime)/tunit) != ((endTime-startTime)/tunit):
     sys.exit("The desired time interval (endTime - startTime) should be a multiple of tunit.")
@@ -35,9 +37,8 @@ if (abs(int(tunit/timeStepSize) - tunit/timeStepSize) >= timeStepSize) and (abs(
     
     
 # Reading the inlet geometry and normal to the inlet condition prepared with 'TubeBundle_readInlet_<CFD-programme>.py' 
-coordList=np.load(casePath+"/inletPython.npy")
-normalInlet=np.load(casePath+"/normalInletPython.npy")
-
+coordList = np.load(os.path.join(output_path, "inletPython.npy"))
+normalInlet = np.load(os.path.join(output_path, "normalInletPython.npy"))
 
 # Initializing U and VOFw
 nTimeSteps=int((endTime-startTime)/timeStepSize)+1 # Plus 1 because first time step is included - last time step is not included.
@@ -161,10 +162,13 @@ print("Inlet was modelled successfully. \n")
        
 # Writing the profile to be used in OpenFOAM
 print("Saving inlet profile to Python (numpy) npy-files.")
-np.save(casePath+'/inletDefinition-U.npy',UVal) # Matrix containing 'coordList' rows (#cell centers) and 'timeVal' columns (# time steps defined) - value of velocity 
-np.save(casePath+'/inletDefinition-VOFw.npy',VOFwVal) # Matrix containing 'coordList' rows (#cell centers) and 'timeVal' columns (# time steps defined) - value of VOFw
-np.save(casePath+'/inletDefinition-time.npy',timeVal) # List containing the time instants where U and alpha.water are defined
-print("Inlet profile saved in Python (numpy) npy-files. \n")
+# Matrix containing 'coordList' rows (#cell centers) and 'timeVal' columns (# time steps defined) - value of velocity
+np.save(os.path.join(output_path, "inletDefinition-U.npy"), UVal)
+# Matrix containing 'coordList' rows (#cell centers) and 'timeVal' columns (# time steps defined) - value of VOFw
+np.save(os.path.join(output_path, "inletDefinition-VOFw.npy"), VOFwVal) 
+# List containing the time instants where U and alpha.water are defined
+np.save(os.path.join(output_path, "inletDefinition-time.npy"), timeVal)
+print("Inlet profile saved in Python (numpy) npy-files.")
 
 # Check: convert to file compatible with ParaView to visualize your pre-inlet domain.
 print("Saving inlet profile to CSV-files. ")

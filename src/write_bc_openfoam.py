@@ -6,7 +6,7 @@
 # OpenFOAM-utility "timeVaryingMappedFixedValue" can be used. This script is called automatically by the masterscript
 # 'TubeBundle_master.sh', so the user input is channeled to this python script from the bash-script directly.
 
-from utils import np, sys, os
+from utils import np, sys, os, NPY_OUT_FOLDER
 
 #writeHeader: to write OpenFOAM-header in file at location 'fileLoc' - class and object of parameter should be given to function
 def writeHeader(fileLoc,className,objectName):
@@ -42,18 +42,20 @@ def write_bc_openfoam(config):
     startTime = float(config["simulation_parameters"]["start_time"])
     inletName = config["simulation_parameters"]["inlet_name"]
     alpha_name = "alpha."+config["simulation_parameters"]["fluid_name"]
+    output_path = os.path.join(casePath, NPY_OUT_FOLDER)
 
-
-    # Inlet model has been previously stored in "$CASE_PATH/inletDefinition-U.npy" and "$CASE_PATH/inletDefinition-VOFw.npy"
-    # Time instants at which these variables were defined are stored in "$CASE_PATH/inletDefinition-time.npy"
-    # Coordinates of the inlet geometry points are stored in "$CASE_PATH/inletPython.npy"
+    # Inlet model has been previously stored in "{output_path}/inletDefinition-U.npy" and "{output_path}/inletDefinition-VOFw.npy"
+    # Time instants at which these variables were defined are stored in "{output_path}/inletDefinition-time.npy"
+    # Coordinates of the inlet geometry points are stored in "{output_path}/inletPython.npy"
     print("Reading defined inlet from Python-files")
-    UVal = np.load(casePath+'/inletDefinition-U.npy') # Matrix containing 'coordList' rows (#cell centers) and 'timeVal' columns (# time steps defined) - value of velocity
-    VOFwVal = np.load(casePath+'/inletDefinition-VOFw.npy') # Matrix containing 'coordList' rows (#cell centers) and 'timeVal' columns (# time steps defined) - value of VOFw
-    timeVal = np.load(casePath+'/inletDefinition-time.npy') # List containing the time instants where U and alpha are defined
-    coordList = np.load(casePath+'/inletPython.npy')
-    print("Finished reading Python-files. \n")
-    
+    # Matrix containing 'coordList' rows (#cell centers) and 'timeVal' columns (# time steps defined) - value of velocity
+    UVal = np.load(os.path.join(output_path, "inletDefinition-U.npy")) 
+    # Matrix containing 'coordList' rows (#cell centers) and 'timeVal' columns (# time steps defined) - value of VOFw
+    VOFwVal = np.load(os.path.join(output_path, "inletDefinition-VOFw.npy")) 
+    # List containing the time instants where U and alpha are defined
+    timeVal = np.load(os.path.join(output_path, "inletDefinition-time.npy")) 
+    coordList = np.load(os.path.join(output_path, "inletPython.npy"))
+    print("Finished reading NPY-files. \n")
     
     # # Test arrays 
     # coordList=np.array([[0,-1,-1,0,0.1],[1,-1,1,0,0.1],[2,1,1,0,0.1],[3,1,-1,0,0.1]])

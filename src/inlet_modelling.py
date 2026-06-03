@@ -4,7 +4,7 @@
 # inlet model for CFD calculations. This script is called automatically by the masterscript 'TubeBundle_master.sh',
 # so the user input is channeled to this python script from the bash-script directly.
 
-from utils import np, sys, random, PI
+from utils import np, sys, os, random, PI, NPY_OUT_FOLDER
 
 class InletModel():
     def __init__(self, UVal, VOFwVal, config):
@@ -138,16 +138,12 @@ def inletModelling(config):
     endTime = float(config["simulation_parameters"]["end_time"])
     timeStepSize = float(config["simulation_parameters"]["delta_time"])
     tunit = float(config["sbm_parameters"]["t_unit"])
-    # inletName = config["simulation_parameters"]["inlet_name"]
-    # rhog = float(config["simulation_parameters"]["rho_g"])
-    # rhol = float(config["simulation_parameters"]["rho_l"])
     mg_tunit = float(config["sbm_parameters"]["mass_bubble"])
     tol_mg = float(config["sbm_parameters"]["mass_bubble_tol"])
     U = float(config["sbm_parameters"]["velocity"])
     mgb_min = float(config["sbm_parameters"]["mass_bubble_min"])
     mgb_max = float(config["sbm_parameters"]["mass_bubble_max"])
-    # intersectBoundary = config["sbm_parameters"]["intersect_boundary"]
-    # intersectBubble = config["sbm_parameters"]["intersect_bubble"]
+    output_path = os.path.join(casePath, NPY_OUT_FOLDER)
 
     if int((endTime-startTime)/tunit) != ((endTime-startTime)/tunit):
         sys.exit("The desired time interval (endTime - startTime) should be a multiple of tunit.")
@@ -156,9 +152,9 @@ def inletModelling(config):
     if (abs(int(tunit/timeStepSize) - tunit/timeStepSize) >= timeStepSize) and (abs((int(tunit/timeStepSize)+1) - tunit/timeStepSize) >= timeStepSize):
         sys.exit("Variable tunit should be a multiple of timeStepSize.")  
 
-    # Reading the inlet geometry and normal to the inlet condition prepared with 'TubeBundle_readInlet_<CFD-programme>.py' 
-    coordList = np.load(casePath + "/inletPython.npy")
-    normalInlet = np.load(casePath + "/normalInletPython.npy")
+    # Reading the inlet geometry and normal to the inlet condition
+    coordList = np.load(os.path.join(output_path, "inletPython.npy"))
+    normalInlet = np.load(os.path.join(output_path, "normalInletPython.npy"))
 
     # Initializing U and VOFw
     nTimeSteps = int((endTime-startTime)/timeStepSize)+1 # Plus 1 because first time step is included - last time step is not included.
@@ -224,19 +220,20 @@ def inletModelling(config):
     # Writing the profile to be used in OpenFOAM
     print("Saving inlet profile to Python (numpy) npy-files.")
     # Matrix containing 'coordList' rows (#cell centers) and 'timeVal' columns (# time steps defined) - value of velocity
-    np.save(casePath+'/inletDefinition-U.npy', inlet.UVal)
+    np.save(os.path.join(output_path, "inletDefinition-U.npy"), inlet.UVal)
     # Matrix containing 'coordList' rows (#cell centers) and 'timeVal' columns (# time steps defined) - value of VOFw
-    np.save(casePath+'/inletDefinition-VOFw.npy', inlet.VOFwVal) 
+    np.save(os.path.join(output_path, "inletDefinition-VOFw.npy"), inlet.VOFwVal) 
     # List containing the time instants where U and alpha.water are defined
-    np.save(casePath+'/inletDefinition-time.npy', timeVal) 
-    print("Inlet profile saved in Python (numpy) npy-files. \n")
+    np.save(os.path.join(output_path, "inletDefinition-time.npy"), timeVal) 
+    print("Inlet profile saved in Python (numpy) npy-files.")
 
     # Check: convert to file compatible with ParaView to visualize your pre-inlet domain.
     print("Saving inlet profile to CSV-files. ")
-    files = [casePath+'/inletDefinition-VOFw.csv', 
-             casePath+'/inletDefinition-Ux.csv', 
-             casePath+'/inletDefinition-Uy.csv', 
-             casePath+'/inletDefinition-Uz.csv']
+    files = [os.path.join(output_path, "inletDefinition-VOFw.csv"),
+             os.path.join(output_path, "inletDefinition-Ux.csv"),
+             os.path.join(output_path, "inletDefinition-Uy.csv"),
+             os.path.join(output_path, "inletDefinition-Uz.csv"),
+            ] 
     toWrite = [inlet.VOFwVal[:, :, 0], inlet.UVal[:, :, 0], inlet.UVal[:, :, 1], inlet.UVal[:, :, 2]]
     for fi in np.arange(len(files)):
         f = open(files[fi], 'w')

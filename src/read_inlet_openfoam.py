@@ -3,7 +3,7 @@
 # script). This script is called automatically by the masterscript 'TubeBundle_master.sh', so the user input is
 # channeled to this python script from the bash-script directly.
 
-from utils import np, os, sys, linecache
+from utils import np, os, sys, linecache, NPY_OUT_FOLDER
 
 def read_inlet_openfoam(config):
     dimesion = config["simulation_parameters"]["dimension"]
@@ -11,6 +11,11 @@ def read_inlet_openfoam(config):
     moduleCFD = config["packages"]["cfd_program"] + "/" + config["packages"]["cfd_version"]
     startTime = str(config["simulation_parameters"]["start_time"])
     inletName = config["simulation_parameters"]["inlet_name"]
+    
+    # create directory for sbm output if it doesn't exist
+    output_path = os.path.join(casePath, NPY_OUT_FOLDER)
+    if not os.path.exists(output_path):
+        os.mkdir(output_path)
 
     # Read inlet boundary from OpenFOAM
     print("Starting 'postProcess' module of OpenFOAM") 
@@ -138,9 +143,8 @@ def read_inlet_openfoam(config):
 
 
     # Save inlet and normal in Python Numpy-array format
-    np.save(casePath+"/inletPython.npy", coordList)
-    np.save(casePath+"/normalInletPython.npy", normalInlet)
-
+    np.save(os.path.join(output_path, "inletPython.npy"), coordList)
+    np.save(os.path.join(output_path, "normalInletPython.npy"), normalInlet)
 
     print("Script 'readInlet_OpenFOAM' completed. \n")
 
