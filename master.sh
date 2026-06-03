@@ -1,78 +1,8 @@
 #!/bin/sh
-# This is the main script for applying the SBM to an inlet with large gas bubbles entering a continuous liquid. This
-# script is only used to concentrate the user-input for the model (and is dependent on the flow solver the user wants to
-# use, denoted by the main IF-statement in the script). The modelling itself is done in two Python-scripts: the first
-# one ("read_inlet_<solver>.py") is flow solver-dependent and is used to create a table from the inlet geometry of the
-# case. The second script ("InletModelling.py") is solver-independent and creates the actual inlet. The used bubble
-# shapes are defined in "InletModelling.py".
 
-# 
-export CFD_PROGRAMME=OpenFOAM # OpenFOAM or ANSYS_CFD
-export CFD_VERSION=v2312-foss-2023a # OpenFOAM/v2406-foss-2023a Version of the CFD-solver (module name= CFD_PROGRAMME/CFD_VERSION)
-export PYTHON_VERSION=Anaconda3-python/2023.09-0 #Anaconda3-python/2022.10
-export CASE_PATH=/cfdfile1/data/fm/radiputr/Documents/02_Simulation/SBM/sbm_unit_test # Location of base case
-
-
-# User input 
-# export DIM=3 # Number of geometrical dimensions of the case (either 2 or 3)
-# export startTime=0 # First flow time to be defined
-# export endTime=0.1 # Last flow time to be defined
-# export timeStepSize=0.001 # Time step size to be used in following calculation
-# export tunit=0.1 # Unit time scale - parameter for inlet modelling. TIME INTERVAL FOR BUBBLE INSERTION
-# export inletName=inlet # Name of the inlet boundary to be modelled
-# export rhog=1.225 # Density of the gas
-# export rhol=998.2 # Density of the liquid
-# export mg=5e-6 # Amount of the gas to be introduced in domain over a time 'tunit'
-# export mgb_min=5e-7 # 10% of mg USED ONLY IN INLETMODELLING
-# export mgb_max=1e-6 # 20% of mg USED ONLY IN INLETMODELLING
-# export tol_mg=1e-7 # Tolerance on the amount of gas to be introduced in domain over a time 'tunit'
-# export U=1 # Velocity of the mixture  to be introduced in domain
-# export intersectBoundary=True # Boolean indicating whether bubbles may intersect domain boundaries
-# export intersectBubble=True # Boolean indicating whether new bubble may intersect previously defined bubbles
-# export mnpf=4 # max nodes per face (Fluent)
-# export time_step_start=0 # start_time_step (Fluent)
-# export n_time_steps=50000 # number of time steps (Fluent)
-# export case_name=second_test.cas.h5 # name of case file (Fluent)
-# export CORES=4 # number of cores to be used
-# export fluid_name=Water
-
-# Load Python (inlet modelling performed in Python Anaconda)
+# load the specified Python module
+export PYTHON_VERSION=Anaconda3-python/2023.09-0
 module load $PYTHON_VERSION
 
-# Execution of the script depends on CFD-programme to be used
-export CFD_MODULE=$CFD_PROGRAMME/$CFD_VERSION
-
-# remove old boundary data TODO delete this
-export OLD_BOUNDARY_DATA=$CASE_PATH/constant/boundaryData
-rm -rf $OLD_BOUNDARY_DATA
-
-# Read the inlet geometry: This script is designed to be case-dependent
-if [ "$CFD_PROGRAMME" = "OpenFOAM" ]
-then
-	# python readInlet_OpenFOAM.py $DIM $CASE_PATH $CFD_MODULE $startTime $inletName
-  python readInlet_OpenFOAM.py
-elif [ "$CFD_PROGRAMME" = "ANSYS_CFD" ]
-then
-  python read_inlet_fluent.py $DIM $CASE_PATH $case_name $time_step_start $n_time_steps $inletName $mnpf $CORES
-else
-  echo "The CFD-programme ($CFD_PROGRAMME) you have tried to use is not defined in the main script."
-	exit 1
-fi
-
-# Model the inlet : This script is designed to be case-independent
-# python inletModelling.py $CASE_PATH $startTime $endTime $timeStepSize $tunit $inletName $rhog $rhol $mg $tol_mg $U $intersectBoundary $intersectBubble $mgb_min $mgb_max
-python inletModelling.py
-
-# The modelled inlet has to be written in a format compatible with the flow solver that is to be used
-if [ "$CFD_PROGRAMME" = "OpenFOAM" ]
-then
-# Write the inlet boundary condition with Python-script
-	# python writeBC_OpenFOAM.py $CASE_PATH $startTime $inletName $fluid_name
-  python writeBC_OpenFOAM.py
-elif [ "$CFD_PROGRAMME" = "ANSYS_CFD" ]
-then
-  python write_bc_fluent.py $DIM $CASE_PATH $case_name $time_step_start $inletName $CORES
-else
-  echo "The CFD-programme ($CFD_PROGRAMME) you have tried to use is not defined in the main script."
-  exit 1
-fi
+# Run Python without creating pycache fils
+PYTHONDONTWRITEBYTECODE=1 python main.py -p no:cacheprovider
