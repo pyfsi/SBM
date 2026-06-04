@@ -25,7 +25,11 @@ if __name__=="__main__":
         if os.path.exists(boundary_data_path):
             shutil.rmtree(boundary_data_path)
 
-    # =======================================================================================    
+    # ======================================================================================= 
+
+    # Create postProcess function configuration for "writeCellCentres" and "writeCellAreas"
+    from src.create_postprocess_functions import create_postprocess_functions
+    create_postprocess_functions(config)
 
     # Read CFD inlet data 
     if cfd_program.lower() == "openfoam":
