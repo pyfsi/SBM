@@ -7,7 +7,9 @@ The model constructs a virtual pre-domain in front of the actual domain's inlet 
 The complete user manual "inletmodelling_manual" is also given in this repository; this a technical manual, without explanation of the concept behind the model or the underlying algorithm. The latter are described in the Ph.D. dissertation of Laurent De Moerloose, published in 2020 at Ghent University. You can find the full text [here](https://lib.ugent.be/catalog/rug01:002978914). The user manual is also in the appendix of this dissertation.
 
 # How To Run
-The configuration settings for the SBM is stored in `config.yaml`. The absolute path to the CFD case can be defined in the `case_path` variable inside `config.yaml`. The following lines of code can be run in the terminal in order to run the code:
+The configuration settings for the SBM is stored in `config.yaml`. The absolute path to the CFD case can be defined in the `case_path` variable inside `config.yaml`. An example configuration file can be found in this repository.
+
+The following lines of code can be run in the terminal in order to run the code:
 ```
 export PYTHON_VERSION=Anaconda3-python/2023.09-0
 module load $PYTHON_VERSION
