@@ -34,6 +34,7 @@ then
 fi
 
 # Copy mesh from mesh case dir if available
+'
 MESHDIR="../meshCase"
 if [ -f "$MESHDIR"/constant/polyMesh/faces ]
 then
@@ -44,6 +45,7 @@ then
     echo "Fatal error: Unable to find mesh in directory $MESHDIR" 1>&2
     exit 1
 fi
+'
 
 # Detect available turbulence lib
 if [ -f "$FOAM_LIBBIN/libmomentumTransportModels.so" ] || [ -f "$FOAM_LIBBIN/libmomentumTransportModels.dll" ]
@@ -64,13 +66,13 @@ else
 fi
 
 # Update patch name and type
-runCommand createPatch -overwrite
+#runCommand createPatch -overwrite
 
 # Set cell zones contained inside the .stl surfaces
-runCommand topoSet -dict system/topoSetZonesDict
+#runCommand topoSet -dict system/topoSetZonesDict
 
 # Set internal fields according to setFieldsDict
-runCommand setFields
+#runCommand setFields
 
 PNAME=p_rgh
 

@@ -17,7 +17,7 @@ application     interFoam;
 
 startFrom       startTime;
 
-startTime       0;
+startTime       0.0;
 
 stopAt          endTime;
 
@@ -50,11 +50,5 @@ libs
     #include "turbulenceLib"
 );
 */
-
-functions
-{
-    #include "FOs/FOwriteCellCentres"
-    #include "FOs/FOwriteCellAreas"
-}
 
 // ************************************************************************* //
