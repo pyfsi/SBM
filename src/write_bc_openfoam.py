@@ -39,7 +39,7 @@ def writeFooter(fileLoc):
 
 def write_bc_openfoam(config):
     casePath = config["case_path"]
-    startTime = float(config["simulation_parameters"]["start_time"])
+    startTime = int(config["simulation_parameters"]["start_time"])
     inletName = config["simulation_parameters"]["inlet_name"]
     alpha_name = "alpha."+config["simulation_parameters"]["fluid_name"]
     output_path = os.path.join(casePath, NPY_OUT_FOLDER)
@@ -77,44 +77,56 @@ def write_bc_openfoam(config):
     # This code writes the inlet values assuming the boundary condition 'timeVaryingMappedFixedValue' is used. It is first checked whether this BC is indeed used. Otherwise, the script returns an error.
     # Also, it is checked whether an averaging operation ('setAverage    true;' in OF) is defined - if so, another error is returned.
     print(f"Checking inlet definition in folder {startTime}.")
-    if False: # requires alpha and U to have a specific format. TODO make file reading more flexible
-        # Check boundary condition for 'U'
-        os.system("cd " + casePath + "; grep -nr " + inletName + " " + startTime + "/U | cut -d : -f 1 > lineNr_U" )
-        lineNameNr = int(open(casePath+"/lineNr_U", 'r').readline())
-        lineTypeU = lineNameNr+1  # inlet BC type is defined on this line - considering Python starts at index zero
-        readTypeU = (open(casePath+"/"+startTime+"/U").readlines())[lineTypeU]
-        boundaryConditionU = (readTypeU.split())[-1][0:-1]
-        os.system("rm " + casePath + "/lineNr_U")
-        if boundaryConditionU != "timeVaryingMappedFixedValue":
-            print('U has type '+readTypeU)
-            sys.exit("The condition for 'U' at the boundary '" + inletName + "' is not set to 'timeVaryingMappedFixedValue'. \n")
-        os.system("cd " + casePath + "; grep -nr " + 'setAverage' + " " + startTime + "/U | cut -d : -f 1 > lineNr_setAvg" )
-        lineNameNr = int(open(casePath+"/lineNr_setAvg", 'r').readline())-1  # Line where 'setAverage' is defined
-        readSetAvg = (open(casePath+"/"+startTime+"/U").readlines())[lineNameNr]
-        setAvg = (readSetAvg.split())[-1][0:-1]
-        os.system("rm " + casePath + "/lineNr_setAvg")
-        if setAvg != "false":
-            sys.exit("Error! The boundary condition at '" + inletName + "' defines an averaging operation for 'U'. This is not compatible with the transient inlet modelling defined in the Python script. \n")
+    # Check boundary condition for 'U'. Boundary condition should be type timeVaryingMappedFixedValue
+    os.system(f"cd {casePath}; grep -nrw {inletName} {startTime}/U | cut -d : -f 1 > lineNr_U")
+    lineNrU_path = os.path.join(casePath, "lineNr_U")
+    lineNameNr = int(open(lineNrU_path, 'r').readline())
+    lineTypeU = lineNameNr+1  # inlet BC type is defined on this line - considering Python starts at index zero
+    U_path = os.path.join(casePath, str(startTime), "U")
+    readTypeU = (open(U_path).readlines())[lineTypeU]
+    boundaryConditionU = (readTypeU.split())[-1][0:-1]
+    os.system(f"rm {casePath}/lineNr_U")
+    if boundaryConditionU != "timeVaryingMappedFixedValue":
+        print(f"U at {inletName} has type {readTypeU}")
+        sys.exit(f"The condition for 'U' at the boundary '{inletName}' is not set to 'timeVaryingMappedFixedValue'. \n")
+    
+    # Boundary condition should not be setAverage
+    os.system(f"cd {casePath}; grep -nr 'setAverage' {startTime}/U | cut -d : -f 1 > lineNr_setAvg" )
+    lineNrsetAvg_path = os.path.join(casePath, "lineNr_setAvg")
+    lineNameNr = int(open(lineNrsetAvg_path, 'r').readline())-1  # Line where 'setAverage' is defined
+    readSetAvg = (open(U_path).readlines())[lineNameNr]
+    setAvg = (readSetAvg.split())[-1][0:-1]
+    os.system(f"rm {casePath}/lineNr_setAvg")
+    if setAvg != "false":
+        sys.exit("Error! The boundary condition at '" + inletName + "' defines an averaging operation for 'U'. \
+                This is not compatible with the transient inlet modelling defined in the Python script. \n")
 
-        # Check boundary condition for alpha
-        os.system("cd " + casePath + "; grep -nr " + inletName + " " + startTime + "/" + alpha_name + " | cut -d : -f 1 > lineNr_VOFw" )
-        lineNameNr = int(open(casePath+"/lineNr_VOFw", 'r').readline())
-        lineTypeVOFw = lineNameNr+1 # inlet BC type is defined on this line - considering Python starts at index zero
-        readTypeVOFw = (open(casePath + "/" + startTime + "/" + alpha_name).readlines())[lineTypeVOFw]
-        boundaryConditionVOFw = (readTypeVOFw.split())[-1][0:-1]
-        os.system("rm " + casePath +"/lineNr_VOFw")    
-        if boundaryConditionVOFw != "timeVaryingMappedFixedValue":
-            print(lineNameNr)
-            sys.exit(f"The condition for {alpha_name} at the boundary '" + inletName + "' is not set to 'timeVaryingMappedFixedValue'. \n")
-        os.system("cd " + casePath + "; grep -nr " + 'setAverage' + " "+ startTime + "/" + alpha_name + " | cut -d : -f 1 > lineNr_setAvg" ) 
-        lineNameNr = int(open(casePath+"/lineNr_setAvg",'r').readline())-1 #Line where 'setAverage' is defined
-        readSetAvg = (open(casePath+"/"+startTime+"/"+alpha_name).readlines())[lineNameNr]
-        setAvg = (readSetAvg.split())[-1][0:-1]
-        os.system("rm " + casePath + "/lineNr_setAvg")
-        if setAvg != "false":
-            sys.exit("Error! The boundary condition at '" + inletName + "' defines an averaging operation for {alpha_name}. This is not compatible with the transient inlet modelling defined in the Python script. \n")
-        print("Inlet definition in folder " + startTime + " is OK. \n")
+    # Check boundary condition for alpha
+    os.system(f"cd {casePath}; grep -nrw {inletName} {startTime}/{alpha_name} | cut -d : -f 1 > lineNr_VOFw" )
+    lineNr_VOFw_path = os.path.join(casePath, "lineNr_VOFw")
+    lineNameNr = int(open(lineNr_VOFw_path, 'r').readline())
+    lineTypeVOFw = lineNameNr+1 # inlet BC type is defined on this line - considering Python starts at index zero
+    alpha_path = os.path.join(casePath, str(startTime), alpha_name)
+    readTypeVOFw = (open(alpha_path).readlines())[lineTypeVOFw]
+    boundaryConditionVOFw = (readTypeVOFw.split())[-1][0:-1]
+    os.system(f"rm {casePath}/lineNr_VOFw")    
+    if boundaryConditionVOFw != "timeVaryingMappedFixedValue":
+        sys.exit(f"The condition for {alpha_name} at the boundary '{inletName}' is not set to 'timeVaryingMappedFixedValue'. \
+                See line {lineNameNr} \n")
+    os.system(f"cd {casePath}; grep -nr 'setAverage' {startTime}/{alpha_name} | cut -d : -f 1 > lineNr_setAvg" ) 
+    lineNr_setAvg_path = os.path.join(casePath, "lineNr_setAvg")
 
+    try:
+        lineNameNr = int()-1 #Line where 'setAverage' is defined
+        readSetAvg = (open(alpha_path).readlines())[lineNameNr]
+        setAvg = (readSetAvg.split())[-1][0:-1]
+        os.system(f"rm {casePath}/lineNr_setAvg")
+        if setAvg != "false":
+            sys.exit(f"Error! The boundary condition at '{inletName}' defines an averaging operation for {alpha_name}. \
+                    This is not compatible with the transient inlet modelling defined in the Python script.")
+        print(f"Inlet definition in folder {startTime} is OK.")
+    except:
+        pass
 
     # Prepare OpenFOAM-directory
     print("Creating folder 'boundaryData'.")
