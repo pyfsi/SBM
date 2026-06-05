@@ -30,7 +30,7 @@ class InletModel():
     def update(self, UVal, VOFwVal):
         self.UVal = UVal
         self.VOFwVal = VOFwVal
-    
+
 def bubbleShape(C_ID, C_t, t, shapeID, mgb, coordList, timeVal, Nshapes, normalInlet, InletModel):
 
     startTime = InletModel.startTime
@@ -86,7 +86,7 @@ def bubbleShape(C_ID, C_t, t, shapeID, mgb, coordList, timeVal, Nshapes, normalI
         i_list = i_mask.nonzero()[0]
 
         j_min = int((timeLoc - rg/U)/timeStepSize)
-        temp = (timeLoc + rg/U) // timeStepSize + 1
+        temp = (timeLoc + rg/U) // timeStepSize
         j_max = int(temp) + 1
         
         # nested loop could maybe be eliminated by vectorization: boolean arithmetic on the matrices
@@ -118,14 +118,9 @@ def bubbleShape(C_ID, C_t, t, shapeID, mgb, coordList, timeVal, Nshapes, normalI
     if not(intersectBoundary):
         if mg_bubbleWall < (mgb-np.average(coordList[:, 4])*U*timeStepSize):
             return False, 0.0
-    #     if TrialBoolean:
-    #         print("mg_checked: "+str(mg_checked))
-    #         print("mgb: "+str(mgb))
 
     # Save temporary files to permanent files
     InletModel.update(UVal_temp, VOFwVal_temp)
-    # UVal = UVal_temp
-    # VOFwVal = VOFwVal_temp
 
     return True, mg_checked
 
@@ -211,7 +206,7 @@ def inletModelling(config):
             else:
                 iter = iter+1
                 residual = mg_tunit-mg_defined
-                print(f"\t mg_bubble {mg_bubble:.10f} \t Residual {residual:.10f}")
+                # print(f"\t mg_bubble {mg_bubble:.10f} \t Residual {residual:.10f}")
             if iter > 1000:
                 sys.exit("Forced exit: 1000 trials of bubble definition have failed; system is ill-defined.")
         print("\t => Time interval " + str(t) + " has been defined: "+str(mg_defined)+"kg of gas was inserted. (desired: "+str(mg_tunit)+"kg).")
