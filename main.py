@@ -4,14 +4,19 @@
 # case. The second script ("inlet_modeling.py") is solver-independent and creates the actual inlet. 
 # The values for the boundary condition are then written by running the third script ("write_bc_<solver>.py")
 
-from utils import os, yaml, shutil
+from utils import os, yaml, shutil, logging
+import cProfile
+logger = logging.getLogger(__name__)
 
-if __name__=="__main__":
-    print("++++++++++Synthetic Bubble Model start++++++++++")
+def main(config):
+    # remove previous log file
+    if os.path.exists("sbm.log"):
+        os.remove("sbm.log")
 
-    # read configuration file
-    with open("config.yaml", "r") as f:
-        config = yaml.load(f, Loader=yaml.SafeLoader)
+    logging.basicConfig(filename="sbm.log", level=logging.INFO)
+    logger.info("++++++++++Synthetic Bubble Model start++++++++++")
+
+    # define config variables
     cfd_program = config["packages"]["cfd_program"]
     case_path = config["case_path"]
     purge_boundary_data = config["purge_boundary_data"]
@@ -55,4 +60,17 @@ if __name__=="__main__":
     else:
         raise RuntimeError("CFD program type not found. It should be either OpenFOAM or ANSYS_CFD")
 
-    print("++++++++++Synthetic Bubble Model end++++++++++")
+    logger.info("++++++++++Synthetic Bubble Model end++++++++++")
+
+
+if __name__=='__main__':
+
+    # read configuration file
+    with open("config.yaml", "r") as f:
+        config = yaml.load(f, Loader=yaml.SafeLoader)
+    profile_run = config.get("profile_run", False)
+
+    if profile_run:
+        cProfile.run("main(config)", "sbm.prof")
+    else:
+        main(config)

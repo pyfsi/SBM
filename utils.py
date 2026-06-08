@@ -8,6 +8,7 @@ import shutil
 from pathlib import Path
 from contextlib import redirect_stdout
 import multiprocessing
+import logging
 
 PI = 3.141592653589793
 NPY_OUT_FOLDER = "sbm_files"
