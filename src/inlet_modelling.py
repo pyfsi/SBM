@@ -141,6 +141,15 @@ def inlet_modelling(config):
     mgb_max = float(config["sbm_parameters"]["mass_bubble_max"])
     output_path = os.path.join(casePath, NPY_OUT_FOLDER)
 
+    # set seed for random number generator
+    seed = config["sbm_parameters"].get("seed", None)
+    if seed=="None":
+        seed = None
+    seed_msg = f"Running simulation with seed {seed} as {type(seed)}"
+    print(seed_msg)
+    logging.info(seed_msg)
+    random.seed(seed)
+
     if int((endTime-startTime)/tunit) != ((endTime-startTime)/tunit):
         sys.exit("The desired time interval (endTime - startTime) should be a multiple of tunit.")
     if endTime <= startTime:
