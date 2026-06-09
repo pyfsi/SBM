@@ -1,4 +1,6 @@
-from utils import os, yaml
+from utils import os, yaml, logging
+logger = logging.getLogger(__name__)
+
 
 # TODO additional functions for openfoam foundation 
 
@@ -129,8 +131,9 @@ def modify_control_dict(file_path):
 
         open(file_path, "w").writelines(temp)
                 
-
 def create_postprocess_functions(config):
+    logger.info("Start create_postprocess_functions")
+
     with open("config.yaml", "r") as f:
         config = yaml.load(f, Loader=yaml.SafeLoader)
     case_path = config["case_path"]
@@ -157,3 +160,5 @@ def create_postprocess_functions(config):
         modify_control_dict(controldict_path)
     else:
         raise RuntimeError("controlDict does not exist.")
+    
+    logger.info("End create_postprocess_functions")

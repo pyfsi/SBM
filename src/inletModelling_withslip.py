@@ -185,4 +185,4 @@ for fi in np.arange(len(files)):
 print("Inlet profile saved to CSV-files. ")
 
 
-print("Script 'inletModelling' completed. \n")
+print("Script 'inlet_modelling' completed. \n")

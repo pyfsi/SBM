@@ -4,7 +4,8 @@
 # inlet model for CFD calculations. This script is called automatically by the masterscript 'TubeBundle_master.sh',
 # so the user input is channeled to this python script from the bash-script directly.
 
-from utils import np, sys, os, random, PI, NPY_OUT_FOLDER
+from utils import np, sys, os, random, PI, NPY_OUT_FOLDER, logging
+logger = logging.getLogger(__name__)
 
 class InletModel():
     def __init__(self, UVal, VOFwVal, config):
@@ -124,8 +125,8 @@ def bubbleShape(C_ID, C_t, t, shapeID, mgb, coordList, timeVal, Nshapes, normalI
 
     return True, mg_checked
 
-def inletModelling(config):
-    print("Starting inlet modelling script.\n")
+def inlet_modelling(config):
+    logger.info("========================Start inlet_modelling========================")
 
     # configuration
     casePath = config["case_path"]
@@ -183,10 +184,9 @@ def inletModelling(config):
     # in bubble are defined in the bubble shapes.
     # The former is 
     nIntervals = int((endTime-startTime)/tunit)  # Number of intervals [0,tunit[
-    print("Between startTime " + str(startTime) + "s and endTime " + str(endTime) + "s, " + str(
-        nIntervals) + " intervals of " + str(tunit) + "s need to be defined.")
+    logger.info(f"Between startTime {startTime} s and endTime {endTime} s, {nIntervals} intervals of {tunit} s need to be defined.")
     for t in np.arange(nIntervals):
-        print(f"Start bubble calculation for time interval {t}")
+        logger.info(f"Start bubble calculation for time interval {t}")
         iter = 0
         mg_defined = 0.0  # Variable checking the amount of gas already defined
         while (mg_tunit-mg_defined) > (tol_mg):
@@ -208,22 +208,22 @@ def inletModelling(config):
                 residual = mg_tunit-mg_defined
                 # print(f"\t mg_bubble {mg_bubble:.10f} \t Residual {residual:.10f}")
             if iter > 1000:
-                sys.exit("Forced exit: 1000 trials of bubble definition have failed; system is ill-defined.")
-        print("\t => Time interval " + str(t) + " has been defined: "+str(mg_defined)+"kg of gas was inserted. (desired: "+str(mg_tunit)+"kg).")
-    print("Inlet was modelled successfully. \n")     
+                sys.exit("Forced exit: 1000 trials of bubble definition have failed.")
+        logger.info(f"\t Mass of inserted gas: {mg_defined} kg. (Target mass: {mg_tunit} kg).")
+    logger.info(f"Inlet was modelled successfully.")
 
     # Writing the profile to be used in OpenFOAM
-    print("Saving inlet profile to Python (numpy) npy-files.")
+    logger.info("Saving inlet profile to Python (numpy) npy-files.")
     # Matrix containing 'coordList' rows (#cell centers) and 'timeVal' columns (# time steps defined) - value of velocity
     np.save(os.path.join(output_path, "inletDefinition-U.npy"), inlet.UVal)
     # Matrix containing 'coordList' rows (#cell centers) and 'timeVal' columns (# time steps defined) - value of VOFw
     np.save(os.path.join(output_path, "inletDefinition-VOFw.npy"), inlet.VOFwVal) 
     # List containing the time instants where U and alpha.water are defined
-    np.save(os.path.join(output_path, "inletDefinition-time.npy"), timeVal) 
-    print("Inlet profile saved in Python (numpy) npy-files.")
+    np.save(os.path.join(output_path, "inletDefinition-time.npy"), timeVal)
+    logger.info("Inlet profile saved in Python (numpy) npy-files.")
 
     # Check: convert to file compatible with ParaView to visualize your pre-inlet domain.
-    print("Saving inlet profile to CSV-files. ")
+    logger.info("Saving inlet profile to CSV-files. ")
     files = [os.path.join(output_path, "inletDefinition-VOFw.csv"),
              os.path.join(output_path, "inletDefinition-Ux.csv"),
              os.path.join(output_path, "inletDefinition-Uy.csv"),
@@ -241,7 +241,6 @@ def inletModelling(config):
                 f.write(str(coordPoint[0]) + ',' + str(coordPoint[1]) + ',' + str(coordPoint[2]) + ',' + str(
                     toWrite[fi][i, j]) + '\n')
         f.close()
-    print("Inlet profile saved to CSV-files. ")
+    logger.info("Inlet profile saved to CSV-files.")
 
-
-    print("Script 'inletModelling' completed. \n")
+    logger.info("========================End inlet_modelling========================")

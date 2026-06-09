@@ -30,7 +30,7 @@ def main(config):
         if os.path.exists(boundary_data_path):
             shutil.rmtree(boundary_data_path)
 
-    # ======================================================================================= 
+    # =========================================================================================================================================================================== 
 
     # Create postProcess function configuration for "writeCellCentres" and "writeCellAreas"
     from src.create_postprocess_functions import create_postprocess_functions
@@ -47,8 +47,8 @@ def main(config):
         raise RuntimeError("CFD program type not found. It should be either OpenFOAM or ANSYS_CFD")
 
     # calculate inlet boundary conditions
-    from src.inlet_modelling import inletModelling
-    inletModelling(config)
+    from src.inlet_modelling import inlet_modelling
+    inlet_modelling(config)
 
     # Write output
     if cfd_program.lower() == "openfoam":

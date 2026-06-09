@@ -3,9 +3,12 @@
 # script). This script is called automatically by the masterscript 'TubeBundle_master.sh', so the user input is
 # channeled to this python script from the bash-script directly.
 
-from utils import np, os, sys, linecache, NPY_OUT_FOLDER
+from utils import np, os, sys, linecache, NPY_OUT_FOLDER, logging
+logger = logging.getLogger(__name__)
 
 def read_inlet_openfoam(config):
+    logger.info("========================Start read_inlet_openfoam========================")
+
     dimesion = config["simulation_parameters"]["dimension"]
     casePath = config["case_path"]
     moduleCFD = config["packages"]["cfd_program"] + "/" + config["packages"]["cfd_version"]
@@ -18,10 +21,11 @@ def read_inlet_openfoam(config):
         os.mkdir(output_path)
 
     # Read inlet boundary from OpenFOAM
-    print("Starting 'postProcess' module of OpenFOAM") 
+    logger.info("Starting 'postProcess' module of OpenFOAM") 
     os.system("cd " + casePath + "; ml " + moduleCFD + "; source $FOAM_BASH; postProcess -time " + startTime + ";")
-    print("Finished 'postProcess'. \n")
-    print("Loading inlet cell coordinates and face areas into Python.")
+    logger.info("Finished 'postProcess'")
+
+    logger.info("Loading inlet cell coordinates and face areas into Python.")
     for i in np.arange(4):
         if i == 0:
             # sourceFile = casePath + "/" + startTime + "/ccx"
@@ -59,7 +63,7 @@ def read_inlet_openfoam(config):
         except ValueError: # If ValueError is triggered, it means that the source-file has a uniform coordinate in the axis you are currently looking
             if 'rowsNr' not in locals(): # If the first coordinate-file has a uniform value, the variable 'rowsNr' does not exist, so you should check whether this variable exists
                 checkFile = casePath + "/" + startTime + "/ccy" # if 'rowsNr' does not exist, read the second sourceFile to know the number of rows
-                os.system("cd " + casePath + "; grep -nr " + inletName + " " + checkFile + " | cut -d : -f 1 > lineNr" ) 
+                os.system("cd " + casePath + "; grep -nr " + inletName + " " + checkFile + " | cut -d : -f 1 > lineNr")
                 lineNameNr_CF = int(open(casePath+"/lineNr",'r').readline())
                 rowsNrIndex_CF = lineNameNr_CF+4 # On this line, the number of cell centers on the inlet is stated
                 os.system("cd " + casePath + "; awk NR==" + str(rowsNrIndex_CF) + " " + checkFile + " > rowsNr")
@@ -85,29 +89,26 @@ def read_inlet_openfoam(config):
         for j in np.arange(5):
             if coordList[i, j] > 1e15:
                 sys.exit("Not all values are correctly read into the Python-script 'TubeBundle_ReadInlet'")
-    #         echo $((lineNr+rowsNr+5))
-    #         head -n $((lineNr+rowsNr+5)) $sourceFile > temp
-    #         tail -n $rowsNr temp > temp2
-    # done
-    print("Completed loading of cell coordinates and face areas into Python.")
-
+    logger.info("Completed loading of cell coordinates and face areas into Python.")
 
     # Determine the normal pointing of the inlet, pointing INTO the domain
     # For this purpose, find three linearly independent points in coordList
-    print("Calculating normal to the inlet.")
+    logger.info("Calculating inlet normals.")
     if dimesion == 3:
         tol_product = 0.01
         point1 = coordList[0, 1:4]
         point2 = coordList[1, 1:4]
         i = 2
         point3 = coordList[i, 1:4]
-        while np.linalg.norm(np.cross(point2 - point1, point3 - point1)) / (
-                np.linalg.norm(point2 - point1) * np.linalg.norm(point3 - point1)) < tol_product:
+        enum = np.linalg.norm(np.cross(point2 - point1, point3 - point1))
+        denom = (np.linalg.norm(point2 - point1) * np.linalg.norm(point3 - point1))
+        while (enum / denom) < tol_product:
             i = i + 1
             point3 = coordList[i, 1:4]
         normalInlet = np.cross(point2 - point1, point3 - point1) * 1.0 / np.linalg.norm(
             np.cross(point2 - point1, point3 - point1))
-        # You still need one more point from the domain to determine the correct orientation of the inlet normal
+        
+        # Need one more point from the domain to determine the correct orientation of the inlet normal
         os.system("cd " + casePath + "; grep -nr '(' constant/polyMesh/points | head -n 1 | cut -d : -f 1 > lineNr")
         lineNameNr = int(open(casePath+"/lineNr", 'r').readline())
         lineNr = lineNameNr+1  # First point that is defined
@@ -139,14 +140,10 @@ def read_inlet_openfoam(config):
     else:
         sys.exit("Number of dimesion should be either 2 or 3.")
         
-    print("Completed calculating normal to the inlet, pointing into the domain: " + str(normalInlet)+".  \n")
-
+    logger.info(f"Completed calculating normal to the inlet, pointing into the domain: {normalInlet}")
 
     # Save inlet and normal in Python Numpy-array format
     np.save(os.path.join(output_path, "inletPython.npy"), coordList)
     np.save(os.path.join(output_path, "normalInletPython.npy"), normalInlet)
 
-    print("Script 'readInlet_OpenFOAM' completed. \n")
-
-
-
+    logger.info("========================End read_inlet_openfoam========================")
