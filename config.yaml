@@ -1,5 +1,6 @@
 case_path:  /path/to/your/openfoam/case
 purge_boundary_data: True     # Purges old boundary data directory
+profile_run:         False    # Profile code execution
 packages:
   cfd_program:  OpenFOAM
   cfd_version:  v2312-foss-2023a
@@ -8,12 +9,13 @@ simulation_parameters:
   dimension:  3               # Number of dimension
   start_time: 0               # Start time of simulation
   end_time: 0.5               # End time of simulation
-  delta_time: 0.002           # Time step size
-  inlet_name: inlet           # Name of inlet boundary patch
-  fluid_name: Water           # Name of fluid. Corresponds to alpha.<fluid_name> defined in OpenFOAM case
+  delta_time: 1e-3            # Time step size
+  inlet_name: inlet           # Case sensitive. Name of inlet boundary patch
+  fluid_name: water           # Case sensitive. Corresponds to alpha.<fluid_name> defined in OpenFOAM case
   rho_g:  1.225               # Density of gas
   rho_l:  998.2               # Density of liquid
 sbm_parameters:
+  seed: 1                     # Seed for random. Set to None for pseudo-RNG. Type (int, float, str, bytes, and bytearray) possible as seed.
   t_unit: 0.1                 # Interval for bubble insertion
   mass_gas: 5e-6              # Mass of gas to be introduced
   mass_bubble_min:  5e-7      # min mass of single bubble to be inserted. Recommendation: 10% of mass_gas
