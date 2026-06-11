@@ -6,7 +6,7 @@
 # OpenFOAM-utility "timeVaryingMappedFixedValue" can be used. This script is called automatically by the masterscript
 # 'TubeBundle_master.sh', so the user input is channeled to this python script from the bash-script directly.
 
-from utils import np, sys, os, NPY_OUT_FOLDER, logging
+from utils import np, sys, os, NPY_OUT_FOLDER, logging, truncate
 logger = logging.getLogger(__name__)
 
 #writeHeader: to write OpenFOAM-header in file at location 'fileLoc' - class and object of parameter should be given to function
@@ -45,6 +45,7 @@ def write_bc_openfoam(config):
     startTime = int(config["simulation_parameters"]["start_time"])
     inletName = config["simulation_parameters"]["inlet_name"]
     alpha_name = "alpha."+config["simulation_parameters"]["fluid_name"]
+    delta_time = float(config["simulation_parameters"]["delta_time"])
     output_path = os.path.join(casePath, NPY_OUT_FOLDER)
 
     # Inlet model has been previously stored in "{output_path}/inletDefinition-U.npy" and "{output_path}/inletDefinition-VOFw.npy"
@@ -143,12 +144,20 @@ def write_bc_openfoam(config):
 
     errVal = 0  # Integer denoting whether os.system has error (>0: at least one error)
     try:
-        errVal += os.system("cd " + casePath + r"/constant; mkdir boundaryData; mkdir boundaryData/"+inletName)
-        errVal += os.system("touch " + casePath + r"/constant/boundaryData/"+inletName+r"/points")
-        for i in np.arange(len(timeVal)):
-            errVal += os.system("cd " + casePath + r"/constant/boundaryData/" + inletName +"; mkdir "+ str(timeVal[i]) +";")
-            errVal += os.system("touch " + casePath + r"/constant/boundaryData/"+inletName+"/"+str(timeVal[i])+"/U;")
-            errVal += os.system("touch " + casePath + r"/constant/boundaryData/"+inletName+"/"+str(timeVal[i])+"/"+alpha_name+";")
+        errVal += os.system(f"cd {casePath}/constant; mkdir boundaryData; mkdir boundaryData/{inletName}")
+        errVal += os.system(f"touch {casePath}/constant/boundaryData/{inletName}/points")
+
+        for time_i in timeVal:
+            trunc_time_i = truncate(time_i, delta_time)
+
+            make_time_dir = f"cd {casePath}/constant/boundaryData/{inletName}; mkdir {trunc_time_i};"
+            errVal += os.system(make_time_dir)
+
+            make_u_dir = f"touch {casePath}/constant/boundaryData/{inletName}/{trunc_time_i}/U;"
+            errVal += os.system(make_u_dir)
+
+            make_alpha_dir = f"touch {casePath}/constant/boundaryData/{inletName}/{trunc_time_i}/{alpha_name};"
+            errVal += os.system(make_alpha_dir)
         if errVal > 0:
             sys.exit("The Python code encountered a problem preparing the OpenFOAM-directory. Make sure that the 'constant' directory exists but does not contain a folder 'boundaryData'.")
     except: 
@@ -160,11 +169,16 @@ def write_bc_openfoam(config):
     # Do not forget to also create boundaryData/inlet/points, containing the coordinates of the inlet points (location where the speed of VOF has to be applied)
     logger.info("Writing inlet definition to folder 'boundaryData'.")
     nPoints = len(coordList[:, 0])
-    for i in np.arange(len(timeVal)):
+    for i, time_i in enumerate(timeVal):
+        trunc_time_i = truncate(time_i, delta_time)
+
         # Set location of files
-        fileLoc_points = casePath + r"/constant/boundaryData/" + inletName + "/points"
-        fileLoc_U = casePath + r"/constant/boundaryData/" + inletName + "/" + str(timeVal[i]) + "/U"
-        fileLoc_VOFw = casePath + r"/constant/boundaryData/" + inletName + "/" + str(timeVal[i]) + "/" + alpha_name
+        fileLoc_points = f"{casePath}/constant/boundaryData/{inletName}/points"
+        U_folder = f"{trunc_time_i}/U"
+        fileLoc_U = f"{casePath}/constant/boundaryData/{inletName}/{U_folder}"
+        VOFw_folder = f"{trunc_time_i}/{alpha_name}"
+        fileLoc_VOFw = f"{casePath}/constant/boundaryData/{inletName}/{VOFw_folder}"
+        
         # Write OpenFOAM-header
         writeHeader(fileLoc_points, "vectorField", "points")
         writeHeader(fileLoc_U, "vectorAverageField", "values")
