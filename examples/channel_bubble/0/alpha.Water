@@ -40038,6 +40038,7 @@ boundaryField
         fieldTable      alpha.Water;
         offset          constant 0;
         value           uniform 1;
+	mapMethod	nearest;
     }
     wall
     {
