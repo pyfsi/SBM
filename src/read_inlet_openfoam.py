@@ -105,8 +105,12 @@ def read_inlet_openfoam(config):
         while (enum / denom) < tol_product:
             i = i + 1
             point3 = coordList[i, 1:4]
-        normalInlet = np.cross(point2 - point1, point3 - point1) * 1.0 / np.linalg.norm(
-            np.cross(point2 - point1, point3 - point1))
+
+            enum = np.linalg.norm(np.cross(point2 - point1, point3 - point1))
+            denom = (np.linalg.norm(point2 - point1) * np.linalg.norm(point3 - point1))
+        
+        normal_vec = np.cross(point2 - point1, point3 - point1)
+        normalInlet = normal_vec / np.linalg.norm(normal_vec)
         
         # Need one more point from the domain to determine the correct orientation of the inlet normal
         os.system("cd " + casePath + "; grep -nr '(' constant/polyMesh/points | head -n 1 | cut -d : -f 1 > lineNr")
