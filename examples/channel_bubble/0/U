@@ -31,7 +31,7 @@ boundaryField
 	    type	timeVaryingMappedFixedValue;
 	    setAverage	false;
 	    offset	(0 0 0);
-	    mapMethod	planarInterpolation; // nearestCell
+	    mapMethod	nearest; //planar or nearest
     }
 
     wall
