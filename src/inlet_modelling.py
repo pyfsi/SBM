@@ -127,6 +127,8 @@ def bubbleShape(C_ID, C_t, t, shapeID, mgb, coordList, timeVal, Nshapes, normalI
 
 def inlet_modelling(config, param):
     logger.info("========================Start inlet_modelling========================")
+    print(f"Running inlet_modelling")
+
 
     # configuration
     casePath = str(config["case_path"])

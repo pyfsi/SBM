@@ -38,8 +38,10 @@ def writeFooter(fileLoc):
     f.write(r'// ************************************************************************* //' + "\n")
     f.close()
 
+    
 def write_bc_openfoam(config, param):
     logger.info("========================Start write_bc_openfoam========================")
+    print(f"Running write_bc_openfoam")
 
     casePath = config["case_path"]
     startTime = int(param["cfd"]["start_time"])
@@ -60,23 +62,6 @@ def write_bc_openfoam(config, param):
     timeVal = np.load(os.path.join(output_path, "inletDefinition-time.npy")) 
     coordList = np.load(os.path.join(output_path, "inletPython.npy"))
     logger.info("Finished reading NPY-files.")
-    
-    # # Test arrays 
-    # coordList=np.array([[0,-1,-1,0,0.1],[1,-1,1,0,0.1],[2,1,1,0,0.1],[3,1,-1,0,0.1]])
-    # UVal=np.zeros([4,2,3])
-    # for j in np.arange(len(UVal[:,0,0])):
-    #     UVal[j,0,0]=0
-    #     UVal[j,0,1]=0
-    #     UVal[j,0,2]=1
-    #     UVal[j,1,0]=0
-    #     UVal[j,1,1]=0
-    #     UVal[j,1,2]=2        
-    # VOFwVal=np.zeros([4,2,1])
-    # for j in np.arange(len(VOFwVal[:,0,0])):
-    #     VOFwVal[j,0,0]=1
-    #     VOFwVal[j,1,0]=0
-    # timeVal=np.array([0,1])
-
 
     # This code writes the inlet values assuming the boundary condition 'timeVaryingMappedFixedValue' is used. It is first checked whether this BC is indeed used. Otherwise, the script returns an error.
     # Also, it is checked whether an averaging operation ('setAverage    true;' in OF) is defined - if so, another error is returned.
@@ -131,7 +116,7 @@ def write_bc_openfoam(config, param):
                     This is not compatible with the transient inlet modelling defined in the Python script.")
         print(f"Inlet definition in folder {startTime} is OK.")
     except:
-        pass
+        os.system(f"rm {casePath}/lineNr_setAvg")
 
     # Prepare OpenFOAM-directory
     logger.info("Creating folder 'boundaryData'.")
@@ -227,5 +212,4 @@ def write_bc_openfoam(config, param):
         writeFooter(fileLoc_VOFw)
 
     logger.info("Finished writing boundary condition to folder 'boundaryData'.")
-
     logger.info("========================End write_bc_openfoam========================")

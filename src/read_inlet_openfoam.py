@@ -8,7 +8,9 @@ logger = logging.getLogger(__name__)
 
 def read_inlet_openfoam(config, param):
     logger.info("========================Start read_inlet_openfoam========================")
+    print(f"Running read_inlet_openfoam")
 
+    # alias for config and param variables
     casePath = str(config["case_path"])
     moduleCFD = str(config["packages"]["cfd_program"] + "/" + config["packages"]["cfd_version"])
     dimesion = int(param["cfd"]["dimension"])
@@ -40,6 +42,7 @@ def read_inlet_openfoam(config, param):
             # In the V-file, writeCellCentres writes cell volumes for internal field 
             # and patch face areas for boundary fields like the inlet.
             sourceFile = f"{casePath}/{startTime}/area" 
+
         try:
             # find line where inlet-list starts; you should redo this for all coordinates as 'writeCellCentres' - when
             # possible - replaces lists of uniform values by a single uniform value statement. If the latter is the case,
@@ -131,11 +134,13 @@ def read_inlet_openfoam(config, param):
     elif dimesion == 2:
         normalInlet = np.zeros([3])
         print("The normal to the inlet cannot be calculated directly. Please give the x-, y- and z-coordinates of the normal vector in the following prompts.")
-        for i in np.arange(3):
+        axis = ["x", "y", "z"]
+        for i, ax_i in enumerate(axis):
             coordOK = False
             while not coordOK:
                 try:
-                    temp_coord = float(raw_input("Please provide the " + str(i+1) + "th coordinate of the normal vector: "))
+                    print(f"Please provide the {ax_i}-component of the normal vector: ")
+                    temp_coord = float(input())
                     coordOK = True
                 except ValueError:
                     print("Please provide a float value. Try again.")
