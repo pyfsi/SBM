@@ -8,24 +8,24 @@ from utils import np, sys, os, random, PI, NPY_OUT_FOLDER, logging
 logger = logging.getLogger(__name__)
 
 class InletModel():
-    def __init__(self, UVal, VOFwVal, config):
+    def __init__(self, UVal, VOFwVal, param):
         self.UVal = UVal
         self.VOFwVal = VOFwVal
 
         # configuration
-        self.startTime = float(config["simulation_parameters"]["start_time"]) 
-        self.endTime = float(config["simulation_parameters"]["end_time"])
-        self.timeStepSize = float(config["simulation_parameters"]["delta_time"])
-        self.tunit = float(config["sbm_parameters"]["t_unit"])
-        self.rhog = float(config["simulation_parameters"]["rho_g"])
-        self.rhol = float(config["simulation_parameters"]["rho_l"])
-        self.mg_tunit = float(config["sbm_parameters"]["mass_gas"])
-        self.tol_mg = float(config["sbm_parameters"]["mass_gas_tol"])
-        self.U = float(config["sbm_parameters"]["velocity"])
-        # self.mgb_min = float(config["sbm_parameters"]["mass_bubble_min"])
-        # self.mgb_max = float(config["sbm_parameters"]["mass_bubble_max"])
-        self.intersectBoundary = config["sbm_parameters"]["intersect_boundary"]
-        self.intersectBubble = config["sbm_parameters"]["intersect_bubble"]
+        self.startTime = float(param["cfd"]["start_time"]) 
+        self.endTime = float(param["cfd"]["end_time"])
+        self.timeStepSize = float(param["cfd"]["delta_time"])
+        self.tunit = float(param["sbm"]["t_unit"])
+        self.rhog = float(param["cfd"]["rho_g"])
+        self.rhol = float(param["cfd"]["rho_l"])
+        self.mg_tunit = float(param["sbm"]["mass_gas"])
+        self.tol_mg = float(param["sbm"]["mass_gas_tol"])
+        self.U = float(param["sbm"]["velocity"])
+        # self.mgb_min = float(param["sbm"]["mass_bubble_min"])
+        # self.mgb_max = float(param["sbm"]["mass_bubble_max"])
+        self.intersectBoundary = param["sbm"]["intersect_boundary"]
+        self.intersectBubble = param["sbm"]["intersect_bubble"]
 
     
     def update(self, UVal, VOFwVal):
@@ -125,24 +125,24 @@ def bubbleShape(C_ID, C_t, t, shapeID, mgb, coordList, timeVal, Nshapes, normalI
 
     return True, mg_checked
 
-def inlet_modelling(config):
+def inlet_modelling(config, param):
     logger.info("========================Start inlet_modelling========================")
 
     # configuration
-    casePath = config["case_path"]
-    startTime = float(config["simulation_parameters"]["start_time"])
-    endTime = float(config["simulation_parameters"]["end_time"])
-    timeStepSize = float(config["simulation_parameters"]["delta_time"])
-    tunit = float(config["sbm_parameters"]["t_unit"])
-    mg_tunit = float(config["sbm_parameters"]["mass_gas"])
-    tol_mg = float(config["sbm_parameters"]["mass_gas_tol"])
-    U = float(config["sbm_parameters"]["velocity"])
-    mgb_min = float(config["sbm_parameters"]["mass_bubble_min"])
-    mgb_max = float(config["sbm_parameters"]["mass_bubble_max"])
+    casePath = str(config["case_path"])
+    startTime = float(param["cfd"]["start_time"])
+    endTime = float(param["cfd"]["end_time"])
+    timeStepSize = float(param["cfd"]["delta_time"])
+    tunit = float(param["sbm"]["t_unit"])
+    mg_tunit = float(param["sbm"]["mass_gas"])
+    tol_mg = float(param["sbm"]["mass_gas_tol"])
+    U = float(param["sbm"]["velocity"])
+    mgb_min = float(param["sbm"]["mass_bubble_min"])
+    mgb_max = float(param["sbm"]["mass_bubble_max"])
+    seed = param["sbm"].get("seed", None)
     output_path = os.path.join(casePath, NPY_OUT_FOLDER)
 
     # set seed for random number generator
-    seed = config["sbm_parameters"].get("seed", None)
     if seed=="None":
         seed = None
     seed_msg = f"Running simulation with seed {seed} as {type(seed)}"
@@ -170,7 +170,7 @@ def inlet_modelling(config):
         UVal[:, :, 2] = U*normalInlet[2]
     VOFwVal = np.ones([len(coordList), nTimeSteps, 1])  # initially: "pre-inlet domain" filled with water
     timeVal = np.arange(startTime, endTime, timeStepSize)  # list of flow times to be defined in this model
-    inlet = InletModel(UVal, VOFwVal, config)
+    inlet = InletModel(UVal, VOFwVal, param)
 
     # Creating bubble shapes - under the hood, so hard-coded shapes
     # Bubble shapes are defined as 1 function named "bubbleShape", comprising a switch based on the shapeID of the bubble

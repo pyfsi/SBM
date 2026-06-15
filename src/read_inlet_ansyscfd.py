@@ -1,15 +1,15 @@
 import ansys.fluent.core as pyfluent
 from utils import np, Path, redirect_stdout, multiprocessing
 
-def read_inlet_ansyscfd(config):
-    dimensions = config["simulation_parameters"]["dimension"]
+def read_inlet_ansyscfd(config, param):
     case_path = str(config["case_path"])
-    case_name = str(config["fluent"]["case_name"])
-    time_step_start = str(config["fluent"]["time_step_start"])
-    n_time_steps = str(config["fluent"]["n_time_steps"])
-    boundary_name = str(config["simulation_parameters"]["inlet_name"])
-    mnpf = int(config["fluent"]["max_nodes_per_face"])
-    cores = min(int(config["fluent"]["cores"]), multiprocessing.cpu_count())
+    dimensions = int(param["cfd"]["dimension"])
+    case_name = str(param["fluent"]["case_name"])
+    time_step_start = str(param["fluent"]["time_step_start"])
+    n_time_steps = str(param["fluent"]["n_time_steps"])
+    boundary_name = str(param["cfd"]["inlet_name"])
+    mnpf = int(param["fluent"]["max_nodes_per_face"])
+    cores = min(int(param["fluent"]["cores"]), multiprocessing.cpu_count())
 
     with open('read_inlet.log', 'w') as logfile:
         with redirect_stdout(logfile):

@@ -1,9 +1,6 @@
 from utils import os, yaml, logging
 logger = logging.getLogger(__name__)
 
-
-# TODO additional functions for openfoam foundation 
-
 def create_write_cell_centres_file(file_path):
     f = open(file_path, 'w')
 
@@ -134,8 +131,6 @@ def modify_control_dict(file_path):
 def create_postprocess_functions(config):
     logger.info("Start create_postprocess_functions")
 
-    with open("config.yaml", "r") as f:
-        config = yaml.load(f, Loader=yaml.SafeLoader)
     case_path = config["case_path"]
 
     # create FO directory and files if not exist

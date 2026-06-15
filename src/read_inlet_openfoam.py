@@ -6,14 +6,14 @@
 from utils import np, os, sys, linecache, NPY_OUT_FOLDER, logging
 logger = logging.getLogger(__name__)
 
-def read_inlet_openfoam(config):
+def read_inlet_openfoam(config, param):
     logger.info("========================Start read_inlet_openfoam========================")
 
-    dimesion = config["simulation_parameters"]["dimension"]
-    casePath = config["case_path"]
-    moduleCFD = config["packages"]["cfd_program"] + "/" + config["packages"]["cfd_version"]
-    startTime = str(config["simulation_parameters"]["start_time"])
-    inletName = config["simulation_parameters"]["inlet_name"]
+    casePath = str(config["case_path"])
+    moduleCFD = str(config["packages"]["cfd_program"] + "/" + config["packages"]["cfd_version"])
+    dimesion = int(param["cfd"]["dimension"])
+    startTime = str(param["cfd"]["start_time"])
+    inletName = str(param["cfd"]["inlet_name"])
     
     # create directory for sbm output if it doesn't exist
     output_path = os.path.join(casePath, NPY_OUT_FOLDER)

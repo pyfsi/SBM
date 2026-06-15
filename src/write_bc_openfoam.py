@@ -38,14 +38,14 @@ def writeFooter(fileLoc):
     f.write(r'// ************************************************************************* //' + "\n")
     f.close()
 
-def write_bc_openfoam(config):
+def write_bc_openfoam(config, param):
     logger.info("========================Start write_bc_openfoam========================")
 
     casePath = config["case_path"]
-    startTime = int(config["simulation_parameters"]["start_time"])
-    inletName = config["simulation_parameters"]["inlet_name"]
-    alpha_name = "alpha."+config["simulation_parameters"]["fluid_name"]
-    delta_time = float(config["simulation_parameters"]["delta_time"])
+    startTime = int(param["cfd"]["start_time"])
+    inletName = str(param["cfd"]["inlet_name"])
+    alpha_name = "alpha."+param["cfd"]["fluid_name"]
+    delta_time = float(param["cfd"]["delta_time"])
     output_path = os.path.join(casePath, NPY_OUT_FOLDER)
 
     # Inlet model has been previously stored in "{output_path}/inletDefinition-U.npy" and "{output_path}/inletDefinition-VOFw.npy"
