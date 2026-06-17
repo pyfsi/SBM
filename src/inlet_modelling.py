@@ -64,7 +64,7 @@ def bubbleShape(C_ID, C_t, t, shapeID, mgb, coordList, timeVal, Nshapes, normalI
         C_checked = True
         timeLoc = C_time - startTime - int((C_time-startTime)/tunit) * tunit  # how many seconds compared to start t_unit
 
-        # Checks below prevents intersection with beginning of t_unit domain
+        # Checks below prevents intersection with beginning of t_unit domain 
         if timeLoc < rg/U:
             C_checked = False
         if timeLoc > (tunit-rg/U):
@@ -147,7 +147,7 @@ def inlet_modelling(config, param):
     # set seed for random number generator
     if seed=="None":
         seed = None
-    seed_msg = f"Running simulation with seed {seed} as {type(seed)}"
+    seed_msg = f"Using seed {seed} as {type(seed)} for random number generator"
     print(seed_msg)
     logging.info(seed_msg)
     random.seed(seed)

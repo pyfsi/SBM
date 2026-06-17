@@ -4,13 +4,15 @@
 # case. The second script ("inlet_modeling.py") is solver-independent and creates the actual inlet. 
 # The values for the boundary condition are then written by running the third script ("write_bc_<solver>.py")
 
-from utils import os, yaml, shutil, logging
+from utils import os, yaml, shutil, logging, get_openfoam_type
 import cProfile
 logger = logging.getLogger(__name__)
 
 def main(config):
     # define config variables
     cfd_program = config["packages"]["cfd_program"]
+    cfd_version = config["packages"]["cfd_version"]
+    config["openfoam_type"] = get_openfoam_type(cfd_version)
     case_path = config["case_path"]
     purge_boundary_data = config["purge_boundary_data"]
 
@@ -42,8 +44,9 @@ def main(config):
             param = yaml.load(f, Loader=yaml.SafeLoader)
 
     # Create postProcess function configuration for "writeCellCentres" and "writeCellAreas"
-    from src.create_postprocess_functions import create_postprocess_functions
-    create_postprocess_functions(config)
+    if cfd_program.lower() == "openfoam":
+        from src.create_postprocess_functions import create_postprocess_functions
+        create_postprocess_functions(config)
 
     # Read CFD inlet data 
     if cfd_program.lower() == "openfoam":

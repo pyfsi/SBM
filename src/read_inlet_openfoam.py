@@ -13,6 +13,7 @@ def read_inlet_openfoam(config, param):
     # alias for config and param variables
     casePath = str(config["case_path"])
     moduleCFD = str(config["packages"]["cfd_program"] + "/" + config["packages"]["cfd_version"])
+    openfoam_type = str(config.get("openfoam_type"))
     dimesion = int(param["cfd"]["dimension"])
     startTime = str(param["cfd"]["start_time"])
     inletName = str(param["cfd"]["inlet_name"])
@@ -23,25 +24,18 @@ def read_inlet_openfoam(config, param):
         os.mkdir(output_path)
 
     # Read inlet boundary from OpenFOAM
-    logger.info("Starting 'postProcess' module of OpenFOAM") 
-    os.system("cd " + casePath + "; ml " + moduleCFD + "; source $FOAM_BASH; postProcess -time " + startTime + ";")
+    logger.info("Starting 'postProcess' module of OpenFOAM")
+    if openfoam_type=="com":
+        os.system("cd " + casePath + "; ml " + moduleCFD + "; source $FOAM_BASH; postProcess -time " + startTime + ";")
+    if openfoam_type=="org":
+        os.system("cd " + casePath + "; ml " + moduleCFD + "; source $FOAM_BASH; foamPostProcess; foamPostProcess -func writeCellCentres;")
     logger.info("Finished 'postProcess'")
 
+    # filenames
+    source_filenames = ["Ccx", "Ccy", "Ccz", "area"]
     logger.info("Loading inlet cell coordinates and face areas into Python.")
-    for i in np.arange(4):
-        if i == 0:
-            # sourceFile = casePath + "/" + startTime + "/ccx"
-            sourceFile = f"{casePath}/{startTime}/Cx"
-        elif i == 1:
-            # sourceFile = casePath + "/" + startTime + "/ccy"
-            sourceFile = f"{casePath}/{startTime}/Cy"
-        elif i == 2:
-            # sourceFile = casePath + "/" + startTime + "/ccz"
-            sourceFile = f"{casePath}/{startTime}/Cz"
-        elif i == 3:
-            # In the V-file, writeCellCentres writes cell volumes for internal field 
-            # and patch face areas for boundary fields like the inlet.
-            sourceFile = f"{casePath}/{startTime}/area" 
+    for i, filename in enumerate(source_filenames):
+        sourceFile = f"{casePath}/{startTime}/{filename}"
 
         try:
             # find line where inlet-list starts; you should redo this for all coordinates as 'writeCellCentres' - when
