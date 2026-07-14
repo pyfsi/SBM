@@ -212,10 +212,12 @@ def write_bc_openfoam(config):
         writeFooter(fileLoc_VOFw)
 
     # move area postProcess file
+    target_area_path = os.path.join(output_path, "area")
+    if os.path.exists(target_area_path):
+        os.remove(target_area_path)
     area_path = os.path.join(casePath, "0", "area")
     if os.path.exists(area_path):
         shutil.move(area_path, output_path)
-
 
     logger.info("Finished writing boundary condition to folder 'boundaryData'.")
     logger.info("========================End write_bc_openfoam========================")
