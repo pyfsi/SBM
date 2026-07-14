@@ -1,12 +1,12 @@
 import ansys.fluent.core as pyfluent
-from utils import np, redirect_stdout, multiprocessing
+from utils import os, np, redirect_stdout, multiprocessing
 
-def write_bc_ansyscfd(config, param):
-    case_path = str(config["case_path"])
-    dimensions = param["cfd"]["dimension"]
-    case_name = str(param["fluent"]["case_name"])
-    time_step_start = str(param["fluent"]["time_step_start"])
-    cores = min(int(param["fluent"]["cores"]), multiprocessing.cpu_count())
+def write_bc_ansyscfd(config):
+    case_path = os.getcwd()
+    dimensions = config["cfd"]["dimension"]
+    case_name = str(config["fluent"]["case_name"])
+    time_step_start = str(config["fluent"]["time_step_start"])
+    cores = min(int(config["fluent"]["cores"]), multiprocessing.cpu_count())
 
     VOFw = np.load('inletDefinition-VOFw.npy')
     face_ids = np.load('face_ids.npy')

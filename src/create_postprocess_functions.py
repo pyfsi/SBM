@@ -24,7 +24,7 @@ def create_write_cell_centres(file_path):
     f.write("\twriteInterval -1;\n")
 
     f.write("}\n")
-    
+
     f.close()
 
 def create_write_cell_areas(file_path, openfoam_type):
@@ -97,7 +97,7 @@ def create_write_cell_areas(file_path, openfoam_type):
 
     f.write("\t#};\n")
     f.write("}\n")
-     
+
     f.close()
 
 def modify_control_dict(file_path, openfoam_type):
@@ -111,7 +111,7 @@ def modify_control_dict(file_path, openfoam_type):
             if line=="functions\n":
                 functions_line_exist[1] = True
                 break
-    
+
     # write include FOs
     if not functions_line_exist[1]:
 
@@ -131,15 +131,15 @@ def modify_control_dict(file_path, openfoam_type):
         # find functions line
         functions_idx = f.index("functions\n")
         functions_end_idx = f[functions_idx:].index("}\n")
-        
+
         # check if includes already added
         fo_writecellcentres = "\t#include \"FOs/FOwriteCellCentres\"\n"
         fo_writecellareas = "\t#include \"FOs/FOwriteCellAreas\"\n"
         fo_writecellcentres_exist = fo_writecellcentres in f[functions_idx:]
         fo_writecellareas_exist = fo_writecellareas in f[functions_idx:]
-            
 
-        temp = f[:functions_idx+2] 
+
+        temp = f[:functions_idx+2]
         if (not fo_writecellcentres_exist) & (openfoam_type=="com"):
             temp.append(fo_writecellcentres)
         if not fo_writecellareas_exist:
@@ -147,12 +147,12 @@ def modify_control_dict(file_path, openfoam_type):
         temp = temp + f[functions_idx+2:]
 
         open(file_path, "w").writelines(temp)
-                
+
 def create_postprocess_functions(config):
     logger.info("Start create_postprocess_functions")
     print(f"Running create_postprocess_functions")
 
-    case_path = config["case_path"]
+    case_path = os.getcwd()
     openfoam_type = config.get("openfoam_type", "com")
 
     # create FO directory and files if not exist
@@ -169,12 +169,12 @@ def create_postprocess_functions(config):
     # write cell areas
     writecellareas_path = os.path.join(fo_dir_path, "FOwriteCellAreas")
     create_write_cell_areas(writecellareas_path, openfoam_type)
-    
+
     # include FOs to controlDict
     controldict_path = os.path.join(case_path, "system", "controlDict")
     if os.path.exists(controldict_path):
         modify_control_dict(controldict_path, openfoam_type)
     else:
         raise RuntimeError("controlDict does not exist.")
-    
+
     logger.info("End create_postprocess_functions")

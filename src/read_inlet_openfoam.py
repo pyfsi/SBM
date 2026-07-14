@@ -6,18 +6,18 @@
 from utils import np, os, sys, linecache, NPY_OUT_FOLDER, logging
 logger = logging.getLogger(__name__)
 
-def read_inlet_openfoam(config, param):
+def read_inlet_openfoam(config):
     logger.info("========================Start read_inlet_openfoam========================")
     print(f"Running read_inlet_openfoam")
 
-    # alias for config and param variables
-    casePath = str(config["case_path"])
+    # alias for config variables
+    casePath = os.getcwd()
     moduleCFD = str(config["packages"]["cfd_program"] + "/" + config["packages"]["cfd_version"])
     openfoam_type = str(config.get("openfoam_type"))
-    dimesion = int(param["cfd"]["dimension"])
-    startTime = str(param["cfd"]["start_time"])
-    inletName = str(param["cfd"]["inlet_name"])
-    
+    dimesion = int(config["cfd"]["dimension"])
+    startTime = str(config["cfd"]["start_time"])
+    inletName = str(config["cfd"]["inlet_name"])
+
     # create directory for sbm output if it doesn't exist
     output_path = os.path.join(casePath, NPY_OUT_FOLDER)
     if not os.path.exists(output_path):
@@ -32,7 +32,10 @@ def read_inlet_openfoam(config, param):
     logger.info("Finished 'postProcess'")
 
     # filenames
-    source_filenames = ["Ccx", "Ccy", "Ccz", "area"]
+    if openfoam_type=="org":
+        source_filenames = ["Ccx", "Ccy", "Ccz", "area"]
+    else:
+        source_filenames = ["Cx", "Cy", "Cz", "area"]
     logger.info("Loading inlet cell coordinates and face areas into Python.")
     for i, filename in enumerate(source_filenames):
         sourceFile = f"{casePath}/{startTime}/{filename}"
@@ -105,10 +108,10 @@ def read_inlet_openfoam(config, param):
 
             enum = np.linalg.norm(np.cross(point2 - point1, point3 - point1))
             denom = (np.linalg.norm(point2 - point1) * np.linalg.norm(point3 - point1))
-        
+
         normal_vec = np.cross(point2 - point1, point3 - point1)
         normalInlet = normal_vec / np.linalg.norm(normal_vec)
-        
+
         # Need one more point from the domain to determine the correct orientation of the inlet normal
         os.system("cd " + casePath + "; grep -nr '(' constant/polyMesh/points | head -n 1 | cut -d : -f 1 > lineNr")
         lineNameNr = int(open(casePath+"/lineNr", 'r').readline())
@@ -142,7 +145,7 @@ def read_inlet_openfoam(config, param):
         normalInlet = (1/np.linalg.norm(normalInlet))*normalInlet
     else:
         sys.exit("Number of dimesion should be either 2 or 3.")
-        
+
     logger.info(f"Completed calculating normal to the inlet, pointing into the domain: {normalInlet}")
 
     # Save inlet and normal in Python Numpy-array format
