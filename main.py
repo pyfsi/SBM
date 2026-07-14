@@ -4,9 +4,16 @@
 # case. The second script ("inlet_modeling.py") is solver-independent and creates the actual inlet.
 # The values for the boundary condition are then written by running the third script ("write_bc_<solver>.py")
 
-from utils import os, yaml, shutil, logging, get_openfoam_type, SBM_DIR
-import cProfile
+from utils import os, yaml, shutil, logging, get_openfoam_type
+import cProfile, pstats
 logger = logging.getLogger(__name__)
+
+def print_prof_stats(prof_name):
+    stats_path = os.path.join(os.getcwd(), "stats.txt")
+    with open(stats_path, "w") as f:
+        ps = pstats.Stats(prof_name, stream=f)
+        ps.sort_stats('cumulative')
+        ps.print_stats()
 
 def main(config):
     # define config variables
@@ -75,7 +82,9 @@ if __name__=='__main__':
     profile_run = config.get("profile_run", False)
 
     if profile_run:
-        cProfile.run("main(config)", "sbm.prof")
-        print(f"Profile results printed to sbm.prof. Visualize by running 'snakeviz sbm.prof'")
+        prof_name = "sbm.prof"
+        cProfile.run("main(config)", prof_name)
+        print_prof_stats(prof_name)
+        print(f"Profile stats printed to stats.txt.")
     else:
         main(config)
