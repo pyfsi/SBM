@@ -6,7 +6,7 @@
 # OpenFOAM-utility "timeVaryingMappedFixedValue" can be used. This script is called automatically by the masterscript
 # 'TubeBundle_master.sh', so the user input is channeled to this python script from the bash-script directly.
 
-from utils import np, sys, os, NPY_OUT_FOLDER, logging, truncate
+from utils import np, sys, os, logging, shutil, truncate, NPY_OUT_FOLDER
 logger = logging.getLogger(__name__)
 
 #writeHeader: to write OpenFOAM-header in file at location 'fileLoc' - class and object of parameter should be given to function
@@ -210,6 +210,12 @@ def write_bc_openfoam(config):
         writeFooter(fileLoc_points)
         writeFooter(fileLoc_U)
         writeFooter(fileLoc_VOFw)
+
+    # move area postProcess file
+    area_path = os.path.join(casePath, "0", "area")
+    if os.path.exists(area_path):
+        shutil.move(area_path, output_path)
+
 
     logger.info("Finished writing boundary condition to folder 'boundaryData'.")
     logger.info("========================End write_bc_openfoam========================")
