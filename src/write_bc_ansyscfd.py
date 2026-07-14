@@ -1,9 +1,9 @@
 import ansys.fluent.core as pyfluent
-from utils import np, redirect_stdout, multiprocessing
+from utils import os, np, redirect_stdout, multiprocessing
 
 def write_bc_ansyscfd(config):
-    dimensions = config["simulation_parameters"]["dimension"]
-    case_path = str(config["case_path"])
+    case_path = os.getcwd()
+    dimensions = config["cfd"]["dimension"]
     case_name = str(config["fluent"]["case_name"])
     time_step_start = str(config["fluent"]["time_step_start"])
     cores = min(int(config["fluent"]["cores"]), multiprocessing.cpu_count())

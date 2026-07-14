@@ -8,38 +8,38 @@ logger = logging.getLogger(__name__)
 
 def read_inlet_openfoam(config):
     logger.info("========================Start read_inlet_openfoam========================")
+    print(f"Running read_inlet_openfoam")
 
-    dimesion = config["simulation_parameters"]["dimension"]
-    casePath = config["case_path"]
-    moduleCFD = config["packages"]["cfd_program"] + "/" + config["packages"]["cfd_version"]
-    startTime = str(config["simulation_parameters"]["start_time"])
-    inletName = config["simulation_parameters"]["inlet_name"]
-    
+    # alias for config variables
+    casePath = os.getcwd()
+    moduleCFD = str(config["packages"]["cfd_program"] + "/" + config["packages"]["cfd_version"])
+    openfoam_type = str(config.get("openfoam_type"))
+    dimesion = int(config["cfd"]["dimension"])
+    startTime = str(config["cfd"]["start_time"])
+    inletName = str(config["cfd"]["inlet_name"])
+
     # create directory for sbm output if it doesn't exist
     output_path = os.path.join(casePath, NPY_OUT_FOLDER)
     if not os.path.exists(output_path):
         os.mkdir(output_path)
 
     # Read inlet boundary from OpenFOAM
-    logger.info("Starting 'postProcess' module of OpenFOAM") 
-    os.system("cd " + casePath + "; ml " + moduleCFD + "; source $FOAM_BASH; postProcess -time " + startTime + ";")
+    logger.info("Starting 'postProcess' module of OpenFOAM")
+    if openfoam_type=="com":
+        os.system("cd " + casePath + "; ml " + moduleCFD + "; source $FOAM_BASH; postProcess -time " + startTime + ";")
+    if openfoam_type=="org":
+        os.system("cd " + casePath + "; ml " + moduleCFD + "; source $FOAM_BASH; foamPostProcess; foamPostProcess -func writeCellCentres;")
     logger.info("Finished 'postProcess'")
 
+    # filenames
+    if openfoam_type=="org":
+        source_filenames = ["Ccx", "Ccy", "Ccz", "area"]
+    else:
+        source_filenames = ["Cx", "Cy", "Cz", "area"]
     logger.info("Loading inlet cell coordinates and face areas into Python.")
-    for i in np.arange(4):
-        if i == 0:
-            # sourceFile = casePath + "/" + startTime + "/ccx"
-            sourceFile = f"{casePath}/{startTime}/Cx"
-        elif i == 1:
-            # sourceFile = casePath + "/" + startTime + "/ccy"
-            sourceFile = f"{casePath}/{startTime}/Cy"
-        elif i == 2:
-            # sourceFile = casePath + "/" + startTime + "/ccz"
-            sourceFile = f"{casePath}/{startTime}/Cz"
-        elif i == 3:
-            # In the V-file, writeCellCentres writes cell volumes for internal field 
-            # and patch face areas for boundary fields like the inlet.
-            sourceFile = f"{casePath}/{startTime}/area" 
+    for i, filename in enumerate(source_filenames):
+        sourceFile = f"{casePath}/{startTime}/{filename}"
+
         try:
             # find line where inlet-list starts; you should redo this for all coordinates as 'writeCellCentres' - when
             # possible - replaces lists of uniform values by a single uniform value statement. If the latter is the case,
@@ -108,10 +108,10 @@ def read_inlet_openfoam(config):
 
             enum = np.linalg.norm(np.cross(point2 - point1, point3 - point1))
             denom = (np.linalg.norm(point2 - point1) * np.linalg.norm(point3 - point1))
-        
+
         normal_vec = np.cross(point2 - point1, point3 - point1)
         normalInlet = normal_vec / np.linalg.norm(normal_vec)
-        
+
         # Need one more point from the domain to determine the correct orientation of the inlet normal
         os.system("cd " + casePath + "; grep -nr '(' constant/polyMesh/points | head -n 1 | cut -d : -f 1 > lineNr")
         lineNameNr = int(open(casePath+"/lineNr", 'r').readline())
@@ -131,11 +131,13 @@ def read_inlet_openfoam(config):
     elif dimesion == 2:
         normalInlet = np.zeros([3])
         print("The normal to the inlet cannot be calculated directly. Please give the x-, y- and z-coordinates of the normal vector in the following prompts.")
-        for i in np.arange(3):
+        axis = ["x", "y", "z"]
+        for i, ax_i in enumerate(axis):
             coordOK = False
             while not coordOK:
                 try:
-                    temp_coord = float(raw_input("Please provide the " + str(i+1) + "th coordinate of the normal vector: "))
+                    print(f"Please provide the {ax_i}-component of the normal vector: ")
+                    temp_coord = float(input())
                     coordOK = True
                 except ValueError:
                     print("Please provide a float value. Try again.")
@@ -143,7 +145,7 @@ def read_inlet_openfoam(config):
         normalInlet = (1/np.linalg.norm(normalInlet))*normalInlet
     else:
         sys.exit("Number of dimesion should be either 2 or 3.")
-        
+
     logger.info(f"Completed calculating normal to the inlet, pointing into the domain: {normalInlet}")
 
     # Save inlet and normal in Python Numpy-array format

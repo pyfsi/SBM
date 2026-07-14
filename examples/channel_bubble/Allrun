@@ -33,20 +33,6 @@ then
     source "$FOAMDIR/etc/bashrc"
 fi
 
-# Copy mesh from mesh case dir if available
-'
-MESHDIR="../meshCase"
-if [ -f "$MESHDIR"/constant/polyMesh/faces ]
-then
-    rm -rf constant/polyMesh
-    cp -r "$MESHDIR"/constant/polyMesh constant/polyMesh
-elif [ ! -f constant/polyMesh/faces ]
-then
-    echo "Fatal error: Unable to find mesh in directory $MESHDIR" 1>&2
-    exit 1
-fi
-'
-
 # Detect available turbulence lib
 if [ -f "$FOAM_LIBBIN/libmomentumTransportModels.so" ] || [ -f "$FOAM_LIBBIN/libmomentumTransportModels.dll" ]
 then

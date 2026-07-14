@@ -27,7 +27,7 @@ def writeHeader(fileLoc,className,objectName):
     f.write('\t object \t\t ' + objectName + ';'+"\n");
     f.write('}'+"\n")
     f.write(r'// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //'+"\n")
-    f.write("\n")  
+    f.write("\n")
     f.close()
 
 
@@ -38,14 +38,16 @@ def writeFooter(fileLoc):
     f.write(r'// ************************************************************************* //' + "\n")
     f.close()
 
+
 def write_bc_openfoam(config):
     logger.info("========================Start write_bc_openfoam========================")
+    print(f"Running write_bc_openfoam")
 
-    casePath = config["case_path"]
-    startTime = int(config["simulation_parameters"]["start_time"])
-    inletName = config["simulation_parameters"]["inlet_name"]
-    alpha_name = "alpha."+config["simulation_parameters"]["fluid_name"]
-    delta_time = float(config["simulation_parameters"]["delta_time"])
+    casePath = os.getcwd()
+    startTime = int(config["cfd"]["start_time"])
+    inletName = str(config["cfd"]["inlet_name"])
+    alpha_name = "alpha."+config["cfd"]["fluid_name"]
+    delta_time = float(config["cfd"]["delta_time"])
     output_path = os.path.join(casePath, NPY_OUT_FOLDER)
 
     # Inlet model has been previously stored in "{output_path}/inletDefinition-U.npy" and "{output_path}/inletDefinition-VOFw.npy"
@@ -53,30 +55,13 @@ def write_bc_openfoam(config):
     # Coordinates of the inlet geometry points are stored in "{output_path}/inletPython.npy"
     logger.info("Reading defined inlet from Python-files")
     # Matrix containing 'coordList' rows (#cell centers) and 'timeVal' columns (# time steps defined) - value of velocity
-    UVal = np.load(os.path.join(output_path, "inletDefinition-U.npy")) 
+    UVal = np.load(os.path.join(output_path, "inletDefinition-U.npy"))
     # Matrix containing 'coordList' rows (#cell centers) and 'timeVal' columns (# time steps defined) - value of VOFw
-    VOFwVal = np.load(os.path.join(output_path, "inletDefinition-VOFw.npy")) 
+    VOFwVal = np.load(os.path.join(output_path, "inletDefinition-VOFw.npy"))
     # List containing the time instants where U and alpha are defined
-    timeVal = np.load(os.path.join(output_path, "inletDefinition-time.npy")) 
+    timeVal = np.load(os.path.join(output_path, "inletDefinition-time.npy"))
     coordList = np.load(os.path.join(output_path, "inletPython.npy"))
     logger.info("Finished reading NPY-files.")
-    
-    # # Test arrays 
-    # coordList=np.array([[0,-1,-1,0,0.1],[1,-1,1,0,0.1],[2,1,1,0,0.1],[3,1,-1,0,0.1]])
-    # UVal=np.zeros([4,2,3])
-    # for j in np.arange(len(UVal[:,0,0])):
-    #     UVal[j,0,0]=0
-    #     UVal[j,0,1]=0
-    #     UVal[j,0,2]=1
-    #     UVal[j,1,0]=0
-    #     UVal[j,1,1]=0
-    #     UVal[j,1,2]=2        
-    # VOFwVal=np.zeros([4,2,1])
-    # for j in np.arange(len(VOFwVal[:,0,0])):
-    #     VOFwVal[j,0,0]=1
-    #     VOFwVal[j,1,0]=0
-    # timeVal=np.array([0,1])
-
 
     # This code writes the inlet values assuming the boundary condition 'timeVaryingMappedFixedValue' is used. It is first checked whether this BC is indeed used. Otherwise, the script returns an error.
     # Also, it is checked whether an averaging operation ('setAverage    true;' in OF) is defined - if so, another error is returned.
@@ -93,7 +78,7 @@ def write_bc_openfoam(config):
     if boundaryConditionU != "timeVaryingMappedFixedValue":
         logger.error(f"U at {inletName} has type {readTypeU}")
         sys.exit(f"The condition for 'U' at the boundary '{inletName}' is not set to 'timeVaryingMappedFixedValue'. \n")
-    
+
     # Boundary condition should not be setAverage
     os.system(f"cd {casePath}; grep -nr 'setAverage' {startTime}/U | cut -d : -f 1 > lineNr_setAvg" )
     lineNrsetAvg_path = os.path.join(casePath, "lineNr_setAvg")
@@ -114,11 +99,11 @@ def write_bc_openfoam(config):
     alpha_path = os.path.join(casePath, str(startTime), alpha_name)
     readTypeVOFw = (open(alpha_path).readlines())[lineTypeVOFw]
     boundaryConditionVOFw = (readTypeVOFw.split())[-1][0:-1]
-    os.system(f"rm {casePath}/lineNr_VOFw")    
+    os.system(f"rm {casePath}/lineNr_VOFw")
     if boundaryConditionVOFw != "timeVaryingMappedFixedValue":
         sys.exit(f"The condition for {alpha_name} at the boundary '{inletName}' is not set to 'timeVaryingMappedFixedValue'. \
                 See line {lineNameNr} \n")
-    os.system(f"cd {casePath}; grep -nr 'setAverage' {startTime}/{alpha_name} | cut -d : -f 1 > lineNr_setAvg" ) 
+    os.system(f"cd {casePath}; grep -nr 'setAverage' {startTime}/{alpha_name} | cut -d : -f 1 > lineNr_setAvg" )
     lineNr_setAvg_path = os.path.join(casePath, "lineNr_setAvg")
 
     try:
@@ -131,7 +116,7 @@ def write_bc_openfoam(config):
                     This is not compatible with the transient inlet modelling defined in the Python script.")
         print(f"Inlet definition in folder {startTime} is OK.")
     except:
-        pass
+        os.system(f"rm {casePath}/lineNr_setAvg")
 
     # Prepare OpenFOAM-directory
     logger.info("Creating folder 'boundaryData'.")
@@ -160,7 +145,7 @@ def write_bc_openfoam(config):
             errVal += os.system(make_alpha_dir)
         if errVal > 0:
             sys.exit("The Python code encountered a problem preparing the OpenFOAM-directory. Make sure that the 'constant' directory exists but does not contain a folder 'boundaryData'.")
-    except: 
+    except:
         sys.exit("The Python code encountered a problem preparing the OpenFOAM-directory. Make sure that the 'constant' directory exists but does not contain a folder 'boundaryData'.")
     logger.info("Folder 'boundaryData' was successfully created.")
 
@@ -178,11 +163,11 @@ def write_bc_openfoam(config):
         fileLoc_U = f"{casePath}/constant/boundaryData/{inletName}/{U_folder}"
         VOFw_folder = f"{trunc_time_i}/{alpha_name}"
         fileLoc_VOFw = f"{casePath}/constant/boundaryData/{inletName}/{VOFw_folder}"
-        
+
         # Write OpenFOAM-header
-        writeHeader(fileLoc_points, "vectorField", "points")
-        writeHeader(fileLoc_U, "vectorAverageField", "values")
-        writeHeader(fileLoc_VOFw, "scalarAverageField", "values")
+        # writeHeader(fileLoc_points, "vectorField", "points")
+        # writeHeader(fileLoc_U, "vectorAverageField", "values")
+        # writeHeader(fileLoc_VOFw, "scalarAverageField", "values")
 
         # Write 'points'-file
         f = open(fileLoc_points, 'a+')
@@ -191,35 +176,35 @@ def write_bc_openfoam(config):
         for j in np.arange(nPoints):
             f.write('(' + str(coordList[j, 1]) + ' ' + str(coordList[j, 2]) + ' ' + str(coordList[j, 3]) + ') \n')
         f.write(')'+'\n')
-        f.close() 
+        f.close()
         # Write 'U'-file
         f=open(fileLoc_U,'a+')
-        
-        # necessary for vectorAverageField, but not used if 'setAverage' 
+
+        # necessary for vectorAverageField, but not used if 'setAverage'
         # is set to false (checked earlier in this script) TODO
         # f.write('//Average'+'\n')
-        # f.write('(0 0 0)'+'\n'+'\n')  
-        
+        # f.write('(0 0 0)'+'\n'+'\n')
+
         f.write('//Data points'+'\n')
         f.write(str(nPoints)+'\n'+'('+'\n')
         for j in np.arange(nPoints):
             f.write('(' + str(UVal[j, i, 0]) + ' ' + str(UVal[j, i, 1]) + ' ' + str(UVal[j, i, 2]) + ') \n')
-        f.write(')'+'\n')  
-        f.close() 
+        f.write(')'+'\n')
+        f.close()
         # Write alpha-file
         f = open(fileLoc_VOFw, 'a+')
 
-        # necessary for vectorAverageField, but not used if 'setAverage' 
+        # necessary for vectorAverageField, but not used if 'setAverage'
         # is set to false (checked earlier in this script) TODO
         # f.write('//Average'+'\n')
         # f.write('0'+'\n'+'\n')  #
-        
+
         f.write('//Data points'+'\n')
         f.write(str(nPoints)+'\n'+'('+'\n')
         for j in np.arange(nPoints):
             f.write(str(VOFwVal[j,i,0])+'\n')
-        f.write(')'+'\n')     
-        f.close() 
+        f.write(')'+'\n')
+        f.close()
 
         # Write OpenFOAM-footers
         writeFooter(fileLoc_points)
@@ -227,5 +212,4 @@ def write_bc_openfoam(config):
         writeFooter(fileLoc_VOFw)
 
     logger.info("Finished writing boundary condition to folder 'boundaryData'.")
-
     logger.info("========================End write_bc_openfoam========================")

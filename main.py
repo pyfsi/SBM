@@ -1,42 +1,46 @@
 # This is the main script for applying the SBM to an inlet with large gas bubbles entering a continuous liquid.
 # The modelling itself is done in two Python-scripts: the first
 # one ("read_inlet_<solver>.py") is flow solver-dependent and is used to create a table from the inlet geometry of the
-# case. The second script ("inlet_modeling.py") is solver-independent and creates the actual inlet. 
+# case. The second script ("inlet_modeling.py") is solver-independent and creates the actual inlet.
 # The values for the boundary condition are then written by running the third script ("write_bc_<solver>.py")
 
-from utils import os, yaml, shutil, logging
+from utils import os, yaml, shutil, logging, get_openfoam_type, SBM_DIR
 import cProfile
 logger = logging.getLogger(__name__)
 
 def main(config):
-    # remove previous log file
-    if os.path.exists("sbm.log"):
-        os.remove("sbm.log")
-
-    logging.basicConfig(filename="sbm.log", level=logging.INFO)
-    logger.info("++++++++++Synthetic Bubble Model start++++++++++")
-
     # define config variables
     cfd_program = config["packages"]["cfd_program"]
-    case_path = config["case_path"]
+    cfd_version = config["packages"]["cfd_version"]
+    config["openfoam_type"] = get_openfoam_type(cfd_version)
+    case_path = os.getcwd()
     purge_boundary_data = config["purge_boundary_data"]
+
+    # remove previous log file
+    log_path = os.path.join(case_path, "sbm.log")
+    if os.path.exists(log_path):
+        os.remove(log_path)
+
+    logging.basicConfig(filename=log_path, level=logging.INFO)
+    logger.info("++++++++++Synthetic Bubble Model start++++++++++")
 
     # check if cfd program is defined
     if (cfd_program.lower() != "openfoam") & (cfd_program.lower() != "ansys_cfd"):
         raise RuntimeError("CFD program type not found. It should be either OpenFOAM or ANSYS_CFD")
-    
+
     if purge_boundary_data:
         boundary_data_path = os.path.join(case_path, "constant", "boundaryData")
         if os.path.exists(boundary_data_path):
             shutil.rmtree(boundary_data_path)
-
-    # =========================================================================================================================================================================== 
+    else:
+        raise RuntimeError("ERROR: boundaryData directory already exists.")
 
     # Create postProcess function configuration for "writeCellCentres" and "writeCellAreas"
-    from src.create_postprocess_functions import create_postprocess_functions
-    create_postprocess_functions(config)
+    if cfd_program.lower() == "openfoam":
+        from src.create_postprocess_functions import create_postprocess_functions
+        create_postprocess_functions(config)
 
-    # Read CFD inlet data 
+    # Read CFD inlet data
     if cfd_program.lower() == "openfoam":
         from src.read_inlet_openfoam import read_inlet_openfoam
         read_inlet_openfoam(config)
@@ -62,15 +66,16 @@ def main(config):
 
     logger.info("++++++++++Synthetic Bubble Model end++++++++++")
 
-
 if __name__=='__main__':
 
     # read configuration file
-    with open("config.yaml", "r") as f:
+    config_path = os.path.join(os.getcwd(), "config.yaml")
+    with open(config_path, "r") as f:
         config = yaml.load(f, Loader=yaml.SafeLoader)
     profile_run = config.get("profile_run", False)
 
     if profile_run:
         cProfile.run("main(config)", "sbm.prof")
+        print(f"Profile results printed to sbm.prof. Visualize by running 'snakeviz sbm.prof'")
     else:
         main(config)
