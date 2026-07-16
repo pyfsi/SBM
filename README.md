@@ -7,9 +7,10 @@ The model constructs a virtual pre-domain in front of the actual domain's inlet 
 The complete user manual "inletmodelling_manual" is also given in this repository; this a technical manual, without explanation of the concept behind the model or the underlying algorithm. The latter are described in the Ph.D. dissertation of Laurent De Moerloose, published in 2020 at Ghent University. You can find the full text [here](https://lib.ugent.be/catalog/rug01:002978914). The user manual is also in the appendix of this dissertation.
 
 # How To Run
-In Linux, the bash script `setup.sh` is used to setup the necessary environment variables. This bash script creates an alias to the SBM directory as well as loads the specified Python version. Alternatively, the user can utilize their own Python installation and add the following line containing the SBM directory path to their `.bashrc` file:
+In Linux, the bash script `setup.sh` is used to setup the necessary environment variables. This bash script creates an alias to the SBM directory and adds it to `PYTHONPATH` as well as loads the specified Python version. Alternatively, the user can utilize their own Python installation and add the following line containing the SBM directory path to their `.bashrc` file:
 ```
 export SBM=/path/to/sbm/directory
+export PYTHONPATH=/path/to/sbm/directory:$PYTHONPATH
 ```
 
 The configuration settings for the SBM is stored in the `config.yaml` file located inside the case directory, where the CFD simulation files are found. An example configuration file can be found in the `examples/channel_bubble` directory.

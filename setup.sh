@@ -1,8 +1,11 @@
 #!/bin/sh
+test=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-# get path to sbm directory
-export SBM=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+# define path to SBM directory
+echo "Defining paths SBM and SBM_POSTPROC"
+export SBM=$test
+export SBM_POSTPROC=$test/postprocess
 
-# load the specified Python module
-export PYTHON_VERSION=Anaconda3-python/2023.09-0
-module load $PYTHON_VERSION
+# append SBM directory path to PYTHONPATH
+echo "Adding $test to PYTHONPATH"
+export PYTHONPATH=$test:$PYTHONPATH
