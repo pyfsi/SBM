@@ -12,7 +12,7 @@ def write_header(file_loc: str, class_name: str, object_name: str):
         f.write(r'\*---------------------------------------------------------------------------*/'+"\n")
         f.write(r'FoamFile'+"\n")
         f.write(r'{'+"\n")
-        f.write('\t version \t\t x;'+"\n")
+        # f.write('\t version \t\t x;'+"\n")
         f.write('\t format \t\t ascii;'+"\n")
         f.write('\t class \t\t ' + class_name + ';'+"\n")
         f.write('\t object \t\t ' + object_name + ';'+"\n");
