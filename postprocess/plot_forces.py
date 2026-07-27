@@ -62,7 +62,7 @@ def plot_data(data: dict, var_name: str, key_type=None, plot_range=None, marker=
     :param var_name:    variable name. must be in data.keys()
     :param key_type:    list of keyword to filter columns. Use None to plot all columns.
     '''
-    fig, (ax0, ax1) = plt.subplots(2, 1, layout='constrained')
+    fig, (ax0, ax1, ax2) = plt.subplots(3, 1, layout='constrained')
 
     # time variables
     time = data[var_name]["time"]
@@ -80,8 +80,6 @@ def plot_data(data: dict, var_name: str, key_type=None, plot_range=None, marker=
     target_keys = list(set(target_keys))
     target_keys.sort()
 
-
-
     for key in target_keys:
         var = data[var_name][key]
 
@@ -97,14 +95,21 @@ def plot_data(data: dict, var_name: str, key_type=None, plot_range=None, marker=
         ax0.set_ylabel(variable_map[var_name])
         ax0.set_xlabel("Time [s]")
         ax0.legend()
-
+        ax0.grid(True)
 
         # PSD
-        ax1.psd(y, NFFT=2**10, Fs=1/dt, label=key, scale_by_freq=True, detrend='mean')
+        ax1.psd(y-np.mean(y), NFFT=2**10, Fs=1/dt, label=key, scale_by_freq=True)
         ax1.set_ylabel("Power Spectral Density [dB/Hz]")
         ax1.set_xlabel("Frequency [Hz]")
-        ax1.legend()
+        # ax1.legend()
+        ax1.grid(True)
 
+        # Spcetral analysis
+        ax2.magnitude_spectrum(y-np.mean(y), Fs=1/dt)
+        ax2.set_ylabel("Magnitude spectrum")
+        ax2.set_xlabel("Frequency [Hz]")
+        # ax2.legend()
+        ax2.grid(True)
 
 if __name__=="__main__":
     # get paths

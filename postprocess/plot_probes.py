@@ -1,4 +1,4 @@
-from utils import os, plt, re, pd
+from utils import os, plt, re, pd, np
 from openfoam_io import get_int, get_vector_array
 
 # regex patterns
@@ -52,20 +52,63 @@ def read_probe_data(probe_loc, probes_path):
 
     return probe_data
 
-def plot_probe_data(probe_data, var_name, probe_idx=None):
-    fig, ax = plt.subplots()
+def plot_probe_data(probe_loc, probe_data, var_name,
+                    probe_idx=None, scale=1000, psd_xrange=[None, None], psd_window=None,
+                    ):
+    fig, (ax0, ax1, ax2) = plt.subplots(3, 1, layout='constrained')
+
+    # time variables
     time = probe_data[var_name]["time"]
+    dt = time[1] - time[0] # assume const timestep
+
     if not probe_idx:
         n_probes = range(len(probe_data[var_name].keys())-1)
     else:
         n_probes = probe_idx
+
     for i in n_probes:
+        # define plot labels
         probe_i = f"P{i}"
+        probe_loc_i = probe_loc[probe_i] * scale
+        temp = np.array2string(probe_loc_i, precision=2, separator=",", suppress_small=True)
+        label = probe_i + " " + temp
+
+        # plot variables
         var = probe_data[var_name][probe_i]
-        ax.plot(time, var, label=probe_i, marker="o")
-        ax.set_ylabel(variable_map[var_name])
-        ax.set_xlabel("Time [s]")
-        ax.legend()
+        if psd_window:
+            x = time[psd_window]
+            y = var[psd_window]
+        else:
+            x = time
+            y = var
+
+        marker = "o"
+        if len(var)>100:
+            marker = None
+        ax0.plot(x, y, label=label, marker=marker)
+        ax0.set_ylabel(variable_map[var_name])
+        ax0.set_xlabel("Time [s]")
+        ax0.grid(True)
+        # ax0.legend(loc='center left', bbox_to_anchor=(1.0, 0.5))
+        # ax0.legend(ncol=4, bbox_to_anchor=(0.5,-0.5), loc='lower center', edgecolor='w')
+
+        # PSD
+        interp_points = 1000 #len(y)
+        print(f"PSD using {interp_points} interpolation points")
+        ax1.psd(y-np.mean(y), NFFT=interp_points, Fs=1/dt, scale_by_freq=True)
+        ax1.set_ylabel("Power Spectral Density [dB/Hz]")
+        ax1.set_xlabel("Frequency [Hz]")
+        ax1.set_xlim(psd_xrange[0], psd_xrange[1])
+        # ax1.legend()
+
+        # Spectral analysis
+        ax2.magnitude_spectrum(y-np.mean(y), Fs=1/dt)
+        ax2.set_ylabel("Magnitude spectrum")
+        ax2.set_xlabel("Frequency [Hz]")
+        ax2.set_xlim(psd_xrange[0], psd_xrange[1])
+        # ax2.legend()
+
+    fig.legend(ncol=4, loc='outside upper right')
 
 if __name__=="__main__":
     # get paths
@@ -75,12 +118,16 @@ if __name__=="__main__":
     probe_loc = read_probe_location(probes_path)
     probe_data = read_probe_data(probe_loc, probes_path)
 
-    # test print
-    # temp = probe_data["p"]["time"].to_numpy()
-    # temp2 = probe_data["U"]["P1"].to_numpy()
+    time = probe_data["p"]["time"]
+    dt = time[1] - time[0] # assume const timestep
+    psd_xrange = [0, 150]
+    psd_window = slice(int(0.05/dt), int(1.0/dt))
 
-    plot_probe_data(probe_data, var_name="p", probe_idx = None)
-    plot_probe_data(probe_data, var_name="alpha.Water", probe_idx = [0,2,4])
+    plot_probe_data(probe_loc, probe_data,
+                    var_name="p", probe_idx = [0,1,2],
+                    psd_xrange=psd_xrange, psd_window=psd_window)
+    plot_probe_data(probe_loc, probe_data,
+                    var_name="alpha.Water", probe_idx = [0,2,4],
+                    psd_xrange=psd_xrange, psd_window=psd_window)
     plt.show()
-
     print("0")

@@ -39,7 +39,7 @@ def get_dict(input_string, keyword):
     else:
         return result.group()
 
-def get_vector_array(input_string, is_int=False):
+def get_vector_array(input_string, is_int=False) -> np.ndarray:
     if is_int:
         pattern = re.compile(
             r'\(' + r'[\s\n]*' + int_pattern + delimiter + int_pattern + delimiter + int_pattern + r'[\s\n]*\)',
