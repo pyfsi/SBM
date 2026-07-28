@@ -3,12 +3,12 @@ from openfoam_io import get_int, get_vector_array
 
 # regex patterns
 probe_loc_pattern = r"# Probe.*"
-float_pattern = r'[+-]?\d*\.?\d*[eE]?[+-]?\d*'
-int_pattern = r'[+-]?\d+'
 delimiter = r'[\s\n]+'
 
 ## USER INPUT
-variable_map = {
+PSD_XRANGE = [0, 150] # in Hz
+PSD_WINDOW = [0.05, 0.1] # in s
+VARIABLE_MAP = {
     "p": "Pressure [Pa]",
     "alpha.Water": "Alpha water [-]",
     "U": "Velocity [m/s]"
@@ -86,7 +86,7 @@ def plot_probe_data(probe_loc, probe_data, var_name,
         if len(var)>100:
             marker = None
         ax0.plot(x, y, label=label, marker=marker)
-        ax0.set_ylabel(variable_map[var_name])
+        ax0.set_ylabel(VARIABLE_MAP[var_name])
         ax0.set_xlabel("Time [s]")
         ax0.grid(True)
         # ax0.legend(loc='center left', bbox_to_anchor=(1.0, 0.5))
@@ -120,14 +120,13 @@ if __name__=="__main__":
 
     time = probe_data["p"]["time"]
     dt = time[1] - time[0] # assume const timestep
-    psd_xrange = [0, 150]
-    psd_window = slice(int(0.05/dt), int(1.0/dt))
+    psd_window = slice(int(PSD_WINDOW[0]/dt), int(PSD_WINDOW[1]/dt))
 
     plot_probe_data(probe_loc, probe_data,
                     var_name="p", probe_idx = [0,1,2],
-                    psd_xrange=psd_xrange, psd_window=psd_window)
+                    psd_xrange=PSD_XRANGE, psd_window=psd_window)
     plot_probe_data(probe_loc, probe_data,
                     var_name="alpha.Water", probe_idx = [0,2,4],
-                    psd_xrange=psd_xrange, psd_window=psd_window)
+                    psd_xrange=PSD_XRANGE, psd_window=psd_window)
     plt.show()
     print("0")

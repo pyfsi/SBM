@@ -3,12 +3,12 @@ from openfoam_io import get_int, get_vector_array
 
 # regex patterns
 cofr_pattern = r"# CofR.*"
-float_pattern = r'[+-]?\d*\.?\d*[eE]?[+-]?\d*'
-int_pattern = r'[+-]?\d+'
 delimiter = r'[\s\n]+'
 
 ## USER INPUT
-variable_map = {
+PSD_XRANGE = [0, 150] # in Hz
+PSD_WINDOW = [0.05, 0.1] # in s
+VARIABLE_MAP = {
     "force": "Force [N]",
     "moment": "Moment [Nm]",
     "U": "Velocity [m/s]"
@@ -54,7 +54,8 @@ def read_data(probes_path) -> dict:
 
     return force_data
 
-def plot_data(data: dict, var_name: str, key_type=None, plot_range=None, marker=None):
+def plot_data(data: dict, var_name: str, key_type=None, marker=None,
+              psd_xrange=[None, None], psd_window=None,):
     '''
     Plot data[var_name].
 
@@ -83,17 +84,18 @@ def plot_data(data: dict, var_name: str, key_type=None, plot_range=None, marker=
     for key in target_keys:
         var = data[var_name][key]
 
-        if plot_range:
-            x = time[plot_range]
-            y = var[plot_range]
+        if psd_window:
+            x = time[psd_window]
+            y = var[psd_window]
         else:
             x = time
             y = var
 
         # time space plot
         ax0.plot(x, y, label=key, marker=marker)
-        ax0.set_ylabel(variable_map[var_name])
+        ax0.set_ylabel(VARIABLE_MAP[var_name])
         ax0.set_xlabel("Time [s]")
+        ax0.set_xlim(np.min(x), np.max(x))
         ax0.legend()
         ax0.grid(True)
 
@@ -101,6 +103,7 @@ def plot_data(data: dict, var_name: str, key_type=None, plot_range=None, marker=
         ax1.psd(y-np.mean(y), NFFT=2**10, Fs=1/dt, label=key, scale_by_freq=True)
         ax1.set_ylabel("Power Spectral Density [dB/Hz]")
         ax1.set_xlabel("Frequency [Hz]")
+        ax1.set_xlim(psd_xrange[0], psd_xrange[1])
         # ax1.legend()
         ax1.grid(True)
 
@@ -108,6 +111,7 @@ def plot_data(data: dict, var_name: str, key_type=None, plot_range=None, marker=
         ax2.magnitude_spectrum(y-np.mean(y), Fs=1/dt)
         ax2.set_ylabel("Magnitude spectrum")
         ax2.set_xlabel("Frequency [Hz]")
+        ax2.set_xlim(psd_xrange[0], psd_xrange[1])
         # ax2.legend()
         ax2.grid(True)
 
@@ -119,12 +123,12 @@ if __name__=="__main__":
     force_data = read_data(probes_path)
     time = force_data["force"]["time"]
     dt = time[1] - time[0] # assume const timestep
-    plot_range = None #slice(int(0.2/dt), int(0.3/dt))
+    psd_window = slice(int(PSD_WINDOW[0]//dt), int(PSD_WINDOW[1]//dt))
 
-    plot_data(force_data, var_name="force", key_type=["total"],
-              plot_range=plot_range, marker=None)
-    plot_data(force_data, var_name="moment", key_type=["total"],
-              plot_range=plot_range, marker=None)
+    plot_data(force_data, var_name="force", key_type=["total"], marker=None,
+              psd_xrange=PSD_XRANGE, psd_window=psd_window,)
+    plot_data(force_data, var_name="moment", key_type=["total"], marker=None,
+              psd_xrange=PSD_XRANGE, psd_window=psd_window,)
     plt.show()
 
     print("plot_forces script ended successfully.")
