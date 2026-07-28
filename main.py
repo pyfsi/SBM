@@ -85,6 +85,8 @@ if __name__=='__main__':
         prof_name = "sbm.prof"
         cProfile.run("main(config)", prof_name)
         print_prof_stats(prof_name)
-        print(f"Profile stats printed to stats.txt.")
+        print(f"Profile statistics printed to stats.txt.")
     else:
         main(config)
+
+    print(f"SBM script ended succesfully. See 'sbm.log' for more details.")
