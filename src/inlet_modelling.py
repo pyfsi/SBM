@@ -4,7 +4,7 @@
 # inlet model for CFD calculations. This script is called automatically by the masterscript 'TubeBundle_master.sh',
 # so the user input is channeled to this python script from the bash-script directly.
 
-from utils import np, sys, os, random, PI, NPY_OUT_FOLDER, logging
+from utils import np, sys, os, random, PI, SBM_OUTPUT, logging
 logger = logging.getLogger(__name__)
 
 # constants
@@ -158,7 +158,7 @@ def inlet_modelling(config):
     mgb_min = float(config["sbm"]["mass_bubble_min"])
     mgb_max = float(config["sbm"]["mass_bubble_max"])
     seed = config["sbm"].get("seed", None)
-    output_path = os.path.join(casePath, NPY_OUT_FOLDER)
+    output_path = os.path.join(casePath, SBM_OUTPUT)
 
     # set seed for random number generator
     if seed=="None":

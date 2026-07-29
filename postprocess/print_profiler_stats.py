@@ -31,19 +31,12 @@ if __name__ == "__main__":
     # paths
     cwd = os.getcwd()
     stats_sbm_path = os.path.join(cwd, "sbm_files", "stats_sbm")
-    prof_path = os.path.join(cwd, 'sbm.prof')
+    prof_path = os.path.join(cwd, "sbm_files", "sbm.prof")
 
     if (os.path.exists(stats_sbm_path)):
         print(f"File path {stats_sbm_path} already exists.")
-        user_input = input("Do you want to overwrite this directory? [y/n]")
-        if (user_input.lower() == "y"):
-            shutil.rmtree(stats_sbm_path)
-            os.mkdir(stats_sbm_path)
-            print(f"Previous statistics files deleted.")
-        else:
-            raise UserWarning(f"Previous statistics files not deleted. Ending print_profiler_stats.py.")
-    else:
-        os.mkdir(stats_sbm_path)
+        shutil.rmtree(stats_sbm_path)
+    os.mkdir(stats_sbm_path)
 
     # print stats
     print_prof_stats(prof_path, stats_sbm_path)

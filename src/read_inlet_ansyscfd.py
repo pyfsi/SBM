@@ -11,7 +11,8 @@ def read_inlet_ansyscfd(config):
     mnpf = int(config["fluent"]["max_nodes_per_face"])
     cores = min(int(config["fluent"]["cores"]), multiprocessing.cpu_count())
 
-    with open('read_inlet.log', 'w') as logfile:
+    log_path = os.path.join(os.getcwd(), "sbm_files", 'read_inlet.log')
+    with open(log_path, 'w') as logfile:
         with redirect_stdout(logfile):
             # Launch fluent and read case
             session = pyfluent.launch_fluent(mode="solver", precision="double", version=f"{dimensions}d",

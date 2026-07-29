@@ -4,7 +4,9 @@
 # case. The second script ("inlet_modeling.py") is solver-independent and creates the actual inlet.
 # The values for the boundary condition are then written by running the third script ("write_bc_<solver>.py")
 
-from utils import os, yaml, shutil, logging, get_openfoam_type
+from utils import os, yaml, shutil, logging
+from utils import get_openfoam_type
+from utils import SBM_OUTPUT
 import cProfile
 logger = logging.getLogger(__name__)
 
@@ -15,13 +17,16 @@ def main(config):
     cfd_version = config["packages"]["cfd_version"]
     config["openfoam_type"] = get_openfoam_type(cfd_version)
     case_path = os.getcwd()
-    purge_boundary_data = config["purge_boundary_data"]
+    purge_boundary_data = config.get("purge_boundary_data", True)
 
-    # remove previous log file
-    log_path = os.path.join(case_path, "sbm.log")
-    if os.path.exists(log_path):
-        os.remove(log_path)
+    # remove previous sbm output files
+    sbm_out_path = os.path.join(case_path, SBM_OUTPUT)
+    if os.path.exists(sbm_out_path):
+        shutil.rmtree(sbm_out_path)
+        print(f"Deleting previous SBM output files.")
+    os.mkdir(sbm_out_path)
 
+    log_path = os.path.join(sbm_out_path, "sbm.log")
     logging.basicConfig(filename=log_path, level=logging.INFO)
     logger.info("++++++++++Synthetic Bubble Model start++++++++++")
 
@@ -77,7 +82,8 @@ if __name__=='__main__':
 
     if profile_run:
         prof_name = "sbm.prof"
-        cProfile.run("main(config)", prof_name)
+        prof_path = os.path.join(os.getcwd(), SBM_OUTPUT, prof_name)
+        cProfile.run("main(config)", prof_path)
     else:
         main(config)
 

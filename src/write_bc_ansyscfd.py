@@ -13,7 +13,8 @@ def write_bc_ansyscfd(config):
     np.savetxt(f'inlet_VOFw_start{time_step_start}.dat', VOFw.squeeze(), fmt='%i')
     np.savetxt('face_ids.dat', face_ids, fmt='%i', header=f'{face_ids.shape[0]}')
 
-    with open('write_bc.log', 'w') as logfile:
+    log_path = os.path.join(os.getcwd(), "sbm_files", 'write_bc.log')
+    with open(log_path, 'w') as logfile:
         with redirect_stdout(logfile):
             # Launch fluent and read case
             session = pyfluent.launch_fluent(mode="solver", precision="double", version=f"{dimensions}d",

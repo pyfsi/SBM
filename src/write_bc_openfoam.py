@@ -1,4 +1,4 @@
-from utils import np, sys, os, logging, shutil, truncate, NPY_OUT_FOLDER
+from utils import np, sys, os, logging, shutil, truncate, SBM_OUTPUT
 logger = logging.getLogger(__name__)
 
 def write_header(file_loc: str, class_name: str, object_name: str):
@@ -35,7 +35,7 @@ def write_bc_openfoam(config):
     inlet_name = str(config["cfd"]["inlet_name"])
     alpha_name = "alpha."+config["cfd"]["fluid_name"]
     delta_time = float(config["cfd"]["delta_time"])
-    output_path = os.path.join(case_path, NPY_OUT_FOLDER)
+    output_path = os.path.join(case_path, SBM_OUTPUT)
 
     logger.info("Reading inlet values from NPY-files")
     U_inlet = np.load(os.path.join(output_path, "inletDefinition-U.npy"))

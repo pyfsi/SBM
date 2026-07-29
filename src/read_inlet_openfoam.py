@@ -1,4 +1,4 @@
-from utils import np, os, sys, linecache, NPY_OUT_FOLDER, logging
+from utils import np, os, sys, linecache, SBM_OUTPUT, logging
 logger = logging.getLogger(__name__)
 
 TOLERANCE = 0.01
@@ -16,7 +16,7 @@ def read_inlet_openfoam(config):
     inlet_name = str(config["cfd"]["inlet_name"])
 
     # create directory for sbm output if it doesn't exist
-    output_path = os.path.join(case_path, NPY_OUT_FOLDER)
+    output_path = os.path.join(case_path, SBM_OUTPUT)
     if not os.path.exists(output_path):
         os.mkdir(output_path)
 

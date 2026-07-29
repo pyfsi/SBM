@@ -32,7 +32,7 @@ plt.rcParams.update({
 
 # constants
 PI = 3.141592653589793
-NPY_OUT_FOLDER = "sbm_files"
+SBM_OUTPUT = "sbm_files"
 SBM_DIR = os.path.dirname(os.path.realpath(__file__))
 
 # functions
