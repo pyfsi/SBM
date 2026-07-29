@@ -5,15 +5,9 @@
 # The values for the boundary condition are then written by running the third script ("write_bc_<solver>.py")
 
 from utils import os, yaml, shutil, logging, get_openfoam_type
-import cProfile, pstats
+import cProfile
 logger = logging.getLogger(__name__)
 
-def print_prof_stats(prof_name):
-    stats_path = os.path.join(os.getcwd(), "stats.txt")
-    with open(stats_path, "w") as f:
-        ps = pstats.Stats(prof_name, stream=f)
-        ps.sort_stats('cumulative')
-        ps.print_stats()
 
 def main(config):
     # define config variables
@@ -84,8 +78,6 @@ if __name__=='__main__':
     if profile_run:
         prof_name = "sbm.prof"
         cProfile.run("main(config)", prof_name)
-        print_prof_stats(prof_name)
-        print(f"Profile statistics printed to stats.txt.")
     else:
         main(config)
 
