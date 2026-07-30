@@ -57,9 +57,11 @@ def read_inlet_openfoam(config):
             tempCoordFile = np.ones([rowsNr, 1]) * float("inf")
             for j in np.arange(rowsNr):
                 tempCoordFile[j, 0] = float(linecache.getline(source_file, lineStartNr + j))
-        except ValueError: # If ValueError is triggered, it means that the source-file has a uniform coordinate in the axis you are currently looking
-            if 'rowsNr' not in locals(): # If the first coordinate-file has a uniform value, the variable 'rowsNr' does not exist, so you should check whether this variable exists
-                checkFile = case_path + "/" + start_time + "/ccy" # if 'rowsNr' does not exist, read the second source_file to know the number of rows
+        # If the source-file has uniform coordinate
+        except ValueError:
+            # If 'rowsNr' not local variable
+            if 'rowsNr' not in locals():
+                checkFile = case_path + "/" + start_time + inlet_geometry_filenames[1]
                 os.system("cd " + case_path + "; grep -nr " + inlet_name + " " + checkFile + " | cut -d : -f 1 > lineNr")
                 lineNameNr_CF = int(open(case_path+"/lineNr",'r').readline())
                 rowsNrIndex_CF = lineNameNr_CF+4 # On this line, the number of cell centers on the inlet is stated
