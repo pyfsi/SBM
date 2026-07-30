@@ -7,12 +7,26 @@ delimiter = r'[\s\n]+'
 
 ## USER INPUT
 PSD_XRANGE = [0, 150] # in Hz
-PSD_WINDOW = [0.05, 0.1] # in s
+PSD_WINDOW = [0.00, 0.2] # in s
 VARIABLE_MAP = {
     "force": "Force [N]",
     "moment": "Moment [Nm]",
     "U": "Velocity [m/s]"
     }
+COLUMN_NAMES = ["time", "total_x", "total_y", "total_z",
+                "pressure_x", "pressure_y", "pressure_z",
+                "viscous_x", "viscous_y", "viscous_z",
+                "NaN" # required, dropped later
+                ]
+LABEL_NAMES = {"total_x": "Total force in x [N]",
+               "total_y": "Total force in y [N]",
+               "total_z": "Total force in z [N]",
+               "pressure_x": "Pressure force in x [N]",
+               "pressure_y": "Pressure force in y [N]",
+               "pressure_z": "Pressure force in z [N]",
+               "viscous_x": "Viscous force in x [N]",
+               "viscous_y": "Viscous force in y [N]",
+               "viscous_z": "Viscous force in z [N]",}
 
 def read_cofr_location(probes_path):
     files = os.listdir(probes_path)
@@ -31,11 +45,6 @@ def read_cofr_location(probes_path):
 
 def read_data(probes_path) -> dict:
     files = os.listdir(probes_path)
-    colnames = ["time", "total_x", "total_y", "total_z",
-                "pressure_x", "pressure_y", "pressure_z",
-                "viscous_x", "viscous_y", "viscous_z",
-                "NaN" # required, dropped later
-                ]
 
     force_data = {}
     for file_i in files:
@@ -45,7 +54,7 @@ def read_data(probes_path) -> dict:
         data = pd.read_csv(fi_path,
                            header=3, # number of header text in both forces.dat and moment.dat
                            delimiter=delim,
-                           names=colnames,
+                           names=COLUMN_NAMES,
                            )
 
         # drop column which contain only NaNs
@@ -69,6 +78,7 @@ def plot_data(data: dict, var_name: str, key_type=None, marker=None,
     time = data[var_name]["time"]
     dt = time[1] - time[0] # assume const timestep
 
+    # get keys that match key_type
     force_keys = data[var_name].keys()[1:]
     target_keys = force_keys
     if key_type:
@@ -91,12 +101,22 @@ def plot_data(data: dict, var_name: str, key_type=None, marker=None,
             x = time
             y = var
 
+        n=len(target_keys)
+        if n%3==0:
+            ncols = 3
+        elif n<6:
+            ncols = n
+        else:
+            ncols = 3
+
         # time space plot
-        ax0.plot(x, y, label=key, marker=marker)
+        ax0.plot(x, y, label=LABEL_NAMES[key], marker=marker)
         ax0.set_ylabel(VARIABLE_MAP[var_name])
         ax0.set_xlabel("Time [s]")
         ax0.set_xlim(np.min(x), np.max(x))
-        ax0.legend()
+        # ax0.legend()
+        ax0.legend(bbox_to_anchor=(0., 1.02, 1., 0.102), loc='lower left',
+                      ncols=ncols, mode="expand", borderaxespad=0.)
         ax0.grid(True)
 
         # PSD
@@ -125,9 +145,10 @@ if __name__=="__main__":
     dt = time[1] - time[0] # assume const timestep
     psd_window = slice(int(PSD_WINDOW[0]//dt), int(PSD_WINDOW[1]//dt))
 
-    plot_data(force_data, var_name="force", key_type=["total"], marker=None,
+    # plot force data. Use key_type to filter which forces to plot.
+    plot_data(force_data, var_name="force", key_type=["total", "pressure", "viscous"], marker=None,
               psd_xrange=PSD_XRANGE, psd_window=psd_window,)
-    plot_data(force_data, var_name="moment", key_type=["total"], marker=None,
+    plot_data(force_data, var_name="moment", key_type=["total", "pressure", "viscous"], marker=None,
               psd_xrange=PSD_XRANGE, psd_window=psd_window,)
     plt.show()
 
