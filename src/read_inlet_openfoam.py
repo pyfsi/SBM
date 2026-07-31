@@ -12,7 +12,7 @@ def read_inlet_openfoam(config):
     case_path = os.getcwd()
     cfd_module = str(config["packages"]["cfd_program"] + "/" + config["packages"]["cfd_version"])
     openfoam_type = str(config.get("openfoam_type"))
-    dimesion = int(config["cfd"]["dimension"])
+    dimension = int(config["cfd"]["dimension"])
     start_time = str(config["cfd"]["start_time"])
     inlet_name = str(config["cfd"]["inlet_name"])
 
@@ -102,7 +102,7 @@ def read_inlet_openfoam(config):
 
     # Calculate inlet normal
     logger.info("Calculating inlet normals.")
-    if dimesion == 3:
+    if dimension == 3:
         point1 = coord_list[0, 1:4]
         point2 = coord_list[1, 1:4]
         i = 2
@@ -139,7 +139,7 @@ def read_inlet_openfoam(config):
             # switch sign if normal_inlet pointing outside
             if np.dot(point_inside_domain-point1, normal_inlet) < 0:
                 normal_inlet = (-1.0)*normal_inlet
-    elif dimesion == 2:
+    elif dimension == 2:
         normal_inlet = np.zeros([3])
         print("The normal to the inlet cannot be calculated directly. Please input the x-, y- and z-coordinates of the normal vector.")
         axis = ["x", "y", "z"]
@@ -155,7 +155,7 @@ def read_inlet_openfoam(config):
             normal_inlet[i] = temp_normal
         normal_inlet = (1/np.linalg.norm(normal_inlet))*normal_inlet
     else:
-        sys.exit("Number of dimesion should be either 2 or 3.")
+        sys.exit("Number of dimension should be either 2 or 3.")
 
     logger.info(f"Completed calculating normal to the inlet, pointing into the domain: {normal_inlet}")
 
