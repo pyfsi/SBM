@@ -1,6 +1,7 @@
-from utils import np, sys, os, logging, shutil, subprocess
+from utils import np, sys, os, logging, shutil, subprocess, ThreadPoolExecutor
 from utils import truncate
 from utils import SBM_OUTPUT
+from functools import partial
 logger = logging.getLogger(__name__)
 
 def write_header(file_loc: str, class_name: str, object_name: str):
@@ -26,6 +27,54 @@ def write_footer(file_loc: str):
     with open(file_loc, 'a+') as f:
         f.write("\n")
         f.write(r'// ************************************************************************* //' + "\n")
+
+def write_time_step(i, args):
+    # arguments
+    delta_time = args[0]
+    boundary_inlet_path = args[1]
+    alpha_name = args[2]
+    n_inlet_points = args[3]
+    U_inlet = args[4]
+    VOF_inlet = args[5]
+    time_inlet = args[6]
+
+    time_i = time_inlet[i]
+    trunc_time_i = truncate(time_i, delta_time)
+
+    # Set location of files
+    U_out_path = f"{boundary_inlet_path}/{trunc_time_i}/U"
+    VOFw_out_path = f"{boundary_inlet_path}/{trunc_time_i}/{alpha_name}"
+
+    # make directory for each time step
+    time_i_dir = os.path.join(boundary_inlet_path, str(trunc_time_i))
+    os.mkdir(time_i_dir)
+    make_u_dir = f"touch {boundary_inlet_path}/{trunc_time_i}/U;"
+    subprocess.run(make_u_dir, shell=True)
+    make_alpha_dir = f"touch {boundary_inlet_path}/{trunc_time_i}/{alpha_name};"
+    subprocess.run(make_alpha_dir, shell=True)
+
+    # Write OpenFOAM-header
+    write_header(U_out_path, "vectorAverageField", "values")
+    write_header(VOFw_out_path, "scalarAverageField", "values")
+
+    # write content
+    with open(U_out_path, 'a+') as f:
+        f.write('//Data points'+'\n')
+        f.write(str(n_inlet_points)+'\n'+'('+'\n')
+        for j in np.arange(n_inlet_points):
+            f.write('(' + str(U_inlet[j, i, 0]) + ' ' + str(U_inlet[j, i, 1]) + ' ' + str(U_inlet[j, i, 2]) + ') \n')
+        f.write(')'+'\n')
+
+    with open(VOFw_out_path, 'a+') as f:
+        f.write('//Data points'+'\n')
+        f.write(str(n_inlet_points)+'\n'+'('+'\n')
+        for j in np.arange(n_inlet_points):
+            f.write(str(VOF_inlet[j,i,0])+'\n')
+        f.write(')'+'\n')
+
+    # Write OpenFOAM-footer
+    write_footer(U_out_path)
+    write_footer(VOFw_out_path)
 
 def write_bc_openfoam(config):
     logger.info("========================Start write_bc_openfoam========================")
@@ -118,64 +167,25 @@ def write_bc_openfoam(config):
     boundary_inlet_path = os.path.join(case_path, "constant", "boundaryData", inlet_name)
     command = f"touch {boundary_inlet_path}/points"
     subprocess.run(command, shell=True)
-    for time_i in time_inlet:
-        trunc_time_i = truncate(time_i, delta_time)
 
-        # make directory for each time step
-        time_i_dir = os.path.join(boundary_inlet_path, str(trunc_time_i))
-        os.mkdir(time_i_dir)
-
-        make_u_dir = f"touch {boundary_inlet_path}/{trunc_time_i}/U;"
-        subprocess.run(make_u_dir, shell=True)
-
-        make_alpha_dir = f"touch {boundary_inlet_path}/{trunc_time_i}/{alpha_name};"
-        subprocess.run(make_alpha_dir, shell=True)
-    logger.info("Boundary condition was successfully saved in 'boundaryData'.")
+    # Write 'points'-file
+    points_out_path = f"{case_path}/constant/boundaryData/{inlet_name}/points"
+    n_inlet_points = len(inlet_coord[:, 0])
+    with open(points_out_path, 'a+') as f:
+        f.write(str(n_inlet_points)+'\n')
+        f.write('('+'\n')
+        for j in np.arange(n_inlet_points):
+            f.write('(' + str(inlet_coord[j, 1]) + ' ' + str(inlet_coord[j, 2]) + ' ' + str(inlet_coord[j, 3]) + ') \n')
+        f.write(')'+'\n')
 
     # Write velocity and volume fraction for water at each time step.
-    logger.info("Writing inlet definition to folder 'boundaryData'.")
-    n_inlet_points = len(inlet_coord[:, 0])
-    for i, time_i in enumerate(time_inlet):
-        trunc_time_i = truncate(time_i, delta_time)
-
-        # Set location of files
-        points_out_path = f"{case_path}/constant/boundaryData/{inlet_name}/points"
-        U_out_path = f"{case_path}/constant/boundaryData/{inlet_name}/{trunc_time_i}/U"
-        VOFw_out_path = f"{case_path}/constant/boundaryData/{inlet_name}/{trunc_time_i}/{alpha_name}"
-
-        # Write OpenFOAM-header
-        write_header(points_out_path, "vectorField", "points")
-        write_header(U_out_path, "vectorAverageField", "values")
-        write_header(VOFw_out_path, "scalarAverageField", "values")
-
-        # Write 'points'-file
-        with open(points_out_path, 'a+') as f:
-            f.write(str(n_inlet_points)+'\n')
-            f.write('('+'\n')
-            for j in np.arange(n_inlet_points):
-                f.write('(' + str(inlet_coord[j, 1]) + ' ' + str(inlet_coord[j, 2]) + ' ' + str(inlet_coord[j, 3]) + ') \n')
-            f.write(')'+'\n')
-
-        with open(U_out_path, 'a+') as f:
-            f.write('//Data points'+'\n')
-            f.write(str(n_inlet_points)+'\n'+'('+'\n')
-            for j in np.arange(n_inlet_points):
-                f.write('(' + str(U_inlet[j, i, 0]) + ' ' + str(U_inlet[j, i, 1]) + ' ' + str(U_inlet[j, i, 2]) + ') \n')
-            f.write(')'+'\n')
-            f.close()
-            # Write alpha-file
-            f = open(VOFw_out_path, 'a+')
-
-            f.write('//Data points'+'\n')
-            f.write(str(n_inlet_points)+'\n'+'('+'\n')
-            for j in np.arange(n_inlet_points):
-                f.write(str(VOF_inlet[j,i,0])+'\n')
-            f.write(')'+'\n')
-
-        # Write OpenFOAM-footer
-        write_footer(points_out_path)
-        write_footer(U_out_path)
-        write_footer(VOFw_out_path)
+    logger.info("Writing boundary condition to folder 'boundaryData'.")
+    args = [delta_time, boundary_inlet_path, alpha_name, n_inlet_points, U_inlet, VOF_inlet, time_inlet]
+    partial_write = partial(write_time_step, args=args)
+    n_workers = os.cpu_count()
+    with ThreadPoolExecutor(max_workers=n_workers) as executor:
+        executor.map(partial_write, np.arange(len(time_inlet)))
+    logger.info("Boundary condition was successfully saved in 'boundaryData'.")
 
     # move area postProcess file
     target_area_path = os.path.join(output_path, "area")
