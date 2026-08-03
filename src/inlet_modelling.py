@@ -4,6 +4,9 @@ logger = logging.getLogger(__name__)
 # constants
 N_SHAPES = 1
 
+def clamp(value, low_bound, up_bound):
+    return min(max(value, low_bound), up_bound)
+
 class InletModel():
     def __init__(self, config, coord_list, normal_inlet):
 
@@ -35,7 +38,7 @@ class InletModel():
         self.velocity[:, :, 0] = self.velocity_bc * normal_inlet[0]
         self.velocity[:, :, 1] = self.velocity_bc * normal_inlet[1]
         self.velocity[:, :, 2] = self.velocity_bc * normal_inlet[2]
-        self.alpha = np.ones([len(coord_list), n_time_step+1, 1])
+        self.alpha = np.ones([len(coord_list), n_time_step, 1])
         self.time = np.arange(self.t_start, self.t_end+self.dt, self.dt)
 
     def update(self, velocity, alpha):
@@ -55,6 +58,7 @@ class InletModel():
         intersect_bubble = self.intersect_bubble
         coord_list = self.coord_list
         normal_inlet = self.normal_inlet
+        n_time_step = int((t_end - t_start)/dt)+1
 
         # temporary storage arrays
         velocity_temp = self.velocity
@@ -68,16 +72,16 @@ class InletModel():
         if shapeID == 0:
             radius_gas = ((3.0*mg_bubble)/(4.0*PI*rhog))**(1.0/3.0)
 
-            # Check that the center point denoted by C_ID and C_t follows a certain set of requirements
-            C_checked = True
             time_loc = C_time - t_start - int((C_time-t_start)/dt_insert) * dt_insert
+            # Checks below prevents intersection with start and end of t_unit domain TODO
+            intersect_with_start = C_time < radius_gas/velocity_bc
+            intersect_with_end = C_time > (t_end-radius_gas/velocity_bc)
 
-            # Checks below prevents intersection with beginning of t_unit domain
-            if time_loc < radius_gas/velocity_bc:
-                C_checked = False
-            if time_loc > (dt_insert-radius_gas/velocity_bc):
-                C_checked = False
-            if not C_checked:
+            #intersect_with_start = time_loc < radius_gas/velocity_bc
+            #intersect_with_end = time_loc > (dt_insert-radius_gas/velocity_bc)
+            if intersect_with_start:
+                return False, 0.0
+            if intersect_with_end:
                 return False, 0.0
 
             mg_defined = 0.0
@@ -105,7 +109,6 @@ class InletModel():
                         if self.alpha[i, time_id, 0] == 1.0:
                             alpha_temp[i, time_id, 0] = 0.0
                             velocity_temp[i, time_id, :] = velocity_bc * normal_inlet[:]
-
                             mg_defined += coord_list[i, 4] * velocity_bc * dt * rhog
                             mg_bubble_wall += coord_list[i, 4] * velocity_bc * dt * rhog
                             n_true_flag += 1
@@ -134,10 +137,10 @@ class InletModel():
         mgb_min = self.mgb_min
         mgb_max = self.mgb_max
 
-        # clamp time insert
         n_dt_per_insert = int(dt_insert / dt)
         C_t_min = t_insert_idx * n_dt_per_insert
         C_t_max = (t_insert_idx + 1) * n_dt_per_insert - 1
+        n_inlet_cells = len(coord_list) - 1
 
         iter = 0
         mg_inserted = 0.0
@@ -145,10 +148,9 @@ class InletModel():
         while abs(mg_per_insert-mg_inserted) > (tol_mg):
             shapeID = 0 #random.randint(0, N_SHAPES - 1)  # randomly select bubble shape
             # sample centerpoint location
-            C_ID = random.randint(0, len(coord_list) - 1)
+            C_ID = random.randint(0, n_inlet_cells)
             # sample centerpoint time location
-            C_t = random.randint(t_insert_idx * int(dt_insert / dt),
-                                    (t_insert_idx + 1) * int(dt_insert / dt) - 1)
+            C_t = random.randint(C_t_min, C_t_max)
             # sample bubble mass
             mg_bubble = random.uniform(min((mgb_min, mg_per_insert - mg_inserted)),
                                         min((mgb_max, mg_per_insert - mg_inserted)))
@@ -171,7 +173,6 @@ def inlet_modelling(config):
     print(f"Running inlet_modelling")
 
     # configuration
-    casePath = os.getcwd()
     t_start = float(config["cfd"]["start_time"])
     t_end = float(config["cfd"]["end_time"])
     dt = float(config["cfd"]["delta_time"])
@@ -179,7 +180,7 @@ def inlet_modelling(config):
     mg_per_insert = float(config["sbm"]["mass_gas"])
     velocity_bc = float(config["sbm"]["velocity"])
     seed = config["sbm"].get("seed", None)
-    output_path = os.path.join(casePath, SBM_OUTPUT)
+    output_path = os.path.join(os.getcwd(), SBM_OUTPUT)
 
     # set seed for random number generator
     if seed=="None":
@@ -200,7 +201,7 @@ def inlet_modelling(config):
     coord_list = np.load(os.path.join(output_path, "inletPython.npy"))
     normal_inlet = np.load(os.path.join(output_path, "normalInletPython.npy"))
 
-    # Initializing U and VOFw
+    # Initialize inlet model class
     inlet_model = InletModel(config, coord_list, normal_inlet)
 
     probabilityShapes = [1.0]
@@ -212,9 +213,9 @@ def inlet_modelling(config):
     # - the center point of a bubble, both in
     # - inlet plane and in time
     # - the bubble mass
-    n_time_insert = int((t_end-t_start)/dt_insert)
+    n_time_insert = int((t_end-t_start)/dt_insert) + 1
     logger.info(f"Between t_start {t_start} s and t_end {t_end} s, {n_time_insert} intervals of {dt_insert} s need to be defined.")
-    for t_insert_idx in np.arange(n_time_insert):
+    for t_insert_idx in range(n_time_insert - 1): # no insertion at last time step
         logger.info(f"Start bubble calculation for time interval {t_insert_idx}")
         mg_inserted = inlet_model.insert_bubbles(t_insert_idx)
         logger.info(f"\t Mass of inserted gas: {mg_inserted} kg. (Target mass: {mg_per_insert} kg).")
