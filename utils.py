@@ -1,17 +1,23 @@
-import sys
-import numpy as np
-import os
-import linecache
-import random
-import yaml
-import shutil
+# system modules
+import sys, os, shutil
 from pathlib import Path
 from contextlib import redirect_stdout
 import multiprocessing
-import logging
+
+# text manipulation + configuration modules
 import re
-import matplotlib.pyplot as plt
+import linecache
+import yaml
+import logging
+
+# numerical
+import random
+import numpy as np
+import scipy.signal as sps
 import pandas as pd
+
+# plotting modules
+import matplotlib.pyplot as plt
 import scienceplots
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor

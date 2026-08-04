@@ -1,4 +1,4 @@
-from utils import os, np, plt, re, pd
+from utils import os, np, plt, re, pd, sps
 from openfoam_io import get_int, get_vector_array
 
 # regex patterns
@@ -7,7 +7,7 @@ delimiter = r'[\s\n]+'
 
 ## USER INPUT
 PSD_XRANGE = [0, 150] # in Hz
-PSD_WINDOW = [0.00, 0.2] # in s
+PSD_WINDOW = [0.05, 0.1] # in s
 VARIABLE_MAP = {
     "force": "Force [N]",
     "moment": "Moment [Nm]",
@@ -72,7 +72,7 @@ def plot_data(data: dict, var_name: str, key_type=None, marker=None,
     :param var_name:    variable name. must be in data.keys()
     :param key_type:    list of keyword to filter columns. Use None to plot all columns.
     '''
-    fig, (ax0, ax1, ax2) = plt.subplots(3, 1, layout='constrained')
+    fig, (ax0, ax1) = plt.subplots(2, 1, layout='constrained')
 
     # time variables
     time = data[var_name]["time"]
@@ -120,20 +120,13 @@ def plot_data(data: dict, var_name: str, key_type=None, marker=None,
         ax0.grid(True)
 
         # PSD
-        ax1.psd(y-np.mean(y), NFFT=2**10, Fs=1/dt, label=key, scale_by_freq=True)
-        ax1.set_ylabel("Power Spectral Density [dB/Hz]")
+        fs, nfft = 1/dt, 2**10
+        freq, pxx = sps.welch(y, fs=fs, nfft=nfft,)
+        ax1.plot(freq, pxx, marker="o")
+        ax1.set_ylabel("PSD [m*m/Hz]")
         ax1.set_xlabel("Frequency [Hz]")
         ax1.set_xlim(psd_xrange[0], psd_xrange[1])
-        # ax1.legend()
-        ax1.grid(True)
-
-        # Spcetral analysis
-        ax2.magnitude_spectrum(y-np.mean(y), Fs=1/dt)
-        ax2.set_ylabel("Magnitude spectrum")
-        ax2.set_xlabel("Frequency [Hz]")
-        ax2.set_xlim(psd_xrange[0], psd_xrange[1])
-        # ax2.legend()
-        ax2.grid(True)
+        ax1.grid()
 
 if __name__=="__main__":
     # get paths
@@ -146,9 +139,9 @@ if __name__=="__main__":
     psd_window = slice(int(PSD_WINDOW[0]//dt), int(PSD_WINDOW[1]//dt))
 
     # plot force data. Use key_type to filter which forces to plot.
-    plot_data(force_data, var_name="force", key_type=["total", "pressure", "viscous"], marker=None,
+    plot_data(force_data, var_name="force", key_type=["total",], marker=None,
               psd_xrange=PSD_XRANGE, psd_window=psd_window,)
-    plot_data(force_data, var_name="moment", key_type=["total", "pressure", "viscous"], marker=None,
+    plot_data(force_data, var_name="moment", key_type=["total",], marker=None,
               psd_xrange=PSD_XRANGE, psd_window=psd_window,)
     plt.show()
 
