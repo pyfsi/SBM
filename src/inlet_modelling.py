@@ -60,9 +60,9 @@ class InletModel():
         normal_inlet = self.normal_inlet
         n_time_step = int((t_end - t_start)/dt)+1
 
-        # temporary storage arrays
-        velocity_temp = self.velocity
-        alpha_temp = self.alpha
+        # temporary storage arrays (must be np.array)
+        velocity_temp = np.array(self.velocity)
+        alpha_temp = np.array(self.alpha)
 
         C_coord = coord_list[C_ID, :]
         C_time = self.time[C_t]
