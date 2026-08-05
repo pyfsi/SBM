@@ -216,7 +216,9 @@ def inlet_modelling(config):
     n_time_insert = int((t_end-t_start)/dt_insert) + 1
     logger.info(f"Between t_start {t_start} s and t_end {t_end} s, {n_time_insert} intervals of {dt_insert} s need to be defined.")
     for t_insert_idx in range(n_time_insert - 1): # no insertion at last time step
-        logger.info(f"Start bubble calculation for time interval {t_insert_idx}")
+        start_msg = f"Start bubble calculation for time interval {t}"
+        logger.info(start_msg)
+        print(start_msg)
         mg_inserted = inlet_model.insert_bubbles(t_insert_idx)
         logger.info(f"\t Mass of inserted gas: {mg_inserted} kg. (Target mass: {mg_per_insert} kg).")
     logger.info(f"Inlet model iteration loop ended.")
