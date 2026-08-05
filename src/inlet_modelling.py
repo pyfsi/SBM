@@ -210,7 +210,9 @@ def inlet_modelling(config):
     nIntervals = int((endTime-startTime)/tunit)
     logger.info(f"Between startTime {startTime} s and endTime {endTime} s, {nIntervals} intervals of {tunit} s need to be defined.")
     for t in np.arange(nIntervals):
-        logger.info(f"Start bubble calculation for time interval {t}")
+        start_msg = f"Start bubble calculation for time interval {t}"
+        logger.info(start_msg)
+        print(start_msg)
         iter = 0
         mg_defined = 0.0
         # iterate until mass of inserted gas within tolerance of target mass
@@ -235,9 +237,10 @@ def inlet_modelling(config):
                 # print(f"\t mg_bubble {mg_bubble:.10f} \t Residual {residual:.10f}")
             if iter > 1000:
                 raise RuntimeError("inlet_modelling took longer than 1000 iterations. Bubble generation with the current configuration file not possible.")
+
         logger.info(f"\t Mass of inserted gas: {mg_defined} kg. (Target mass: {mg_tunit} kg).")
 
-
+    print("Inlet model iteration loop ended.")
     logger.info(f"Inlet model iteration loop ended.")
 
     # Writing the profile to be used in OpenFOAM
