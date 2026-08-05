@@ -6,8 +6,9 @@ cofr_pattern = r"# CofR.*"
 delimiter = r'[\s\n]+'
 
 ## USER INPUT
-PSD_XRANGE = [0, 150] # in Hz
-PSD_WINDOW = [0.05, 0.1] # in s
+PSD_XRANGE = [0, 500] # in Hz
+PSD_WINDOW = [0.00, 0.2] # in s
+NFFT = 2**11 # number of interpolation points for FFT
 VARIABLE_MAP = {
     "force": "Force [N]",
     "moment": "Moment [Nm]",
@@ -120,8 +121,8 @@ def plot_data(data: dict, var_name: str, key_type=None, marker=None,
         ax0.grid(True)
 
         # PSD
-        fs, nfft = 1/dt, 2**10
-        freq, pxx = sps.welch(y, fs=fs, nfft=nfft,)
+        fs = 1/dt
+        freq, pxx = sps.welch(y, fs=fs, nfft=NFFT,)
         ax1.plot(freq, pxx, marker="o")
         ax1.set_ylabel("PSD [m*m/Hz]")
         ax1.set_xlabel("Frequency [Hz]")
