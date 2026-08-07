@@ -102,6 +102,10 @@ def plot_data(data: dict, var_name: str, key_type=None, marker=None,
             x = time
             y = var
 
+        # convert to numpy array
+        x = x.to_numpy()
+        y = y.to_numpy()
+
         n=len(target_keys)
         if n%3==0:
             ncols = 3
