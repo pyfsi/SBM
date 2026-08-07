@@ -22,7 +22,7 @@ import scienceplots
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
-plt.style.use('science')
+# plt.style.use('science')
 plt.rcParams["figure.figsize"] = (20,20)
 plt.rcParams.update({
     'axes.labelsize': 14,      # Font size for axis labels
