@@ -20,7 +20,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import scienceplots
 
-plt.style.use('science')
+# plt.style.use('science')
 plt.rcParams["figure.figsize"] = (20,20)
 plt.rcParams.update({
     'axes.labelsize': 14,      # Font size for axis labels
