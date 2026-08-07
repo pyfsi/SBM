@@ -39,7 +39,7 @@ class InletModel():
         self.velocity[:, :, 1] = self.velocity_bc * normal_inlet[1]
         self.velocity[:, :, 2] = self.velocity_bc * normal_inlet[2]
         self.alpha = np.ones([len(coord_list), n_time_step, 1])
-        self.time = np.arange(self.t_start, self.t_end+self.dt, self.dt)
+        self.time = np.linspace(self.t_start, self.t_end+self.dt, n_time_step)
 
     def update(self, velocity, alpha):
         self.velocity = velocity
@@ -156,13 +156,16 @@ class InletModel():
                                         min((mgb_max, mg_per_insert - mg_inserted)))
 
             is_bubble_defined, mg_defined = self.define_bubble(C_ID, C_t, t_insert_idx, shapeID, mg_bubble)
+
+            # print for debugging
+            # residual = mg_per_insert-mg_inserted
+            # print(f"\t mg_bubble {mg_bubble:.3e} \t Residual {residual:.3e}")
+
             if is_bubble_defined:
                 mg_inserted += mg_defined
                 iter = 0
             else:
                 iter = iter+1
-                residual = mg_per_insert-mg_inserted
-                # print(f"\t mg_bubble {mg_bubble:.10f} \t Residual {residual:.10f}")
             if iter > 1000:
                 raise RuntimeError("inlet_modelling took longer than 1000 iterations.")
 
@@ -191,11 +194,11 @@ def inlet_modelling(config):
     random.seed(seed)
 
     if int((t_end-t_start)/dt_insert) != ((t_end-t_start)/dt_insert):
-        sys.exit("The desired time interval (t_end - t_start) should be a multiple of dt_insert.")
+        raise RuntimeError("The desired time interval (t_end - t_start) should be a multiple of dt_insert.")
     if t_end <= t_start:
-        sys.exit("The t_end should be larger than the t_start.")
+        raise RuntimeError("The t_end should be larger than the t_start.")
     if (abs(int(dt_insert/dt) - dt_insert/dt) >= dt) and (abs((int(dt_insert/dt)+1) - dt_insert/dt) >= dt):
-        sys.exit("Variable dt_insert should be a multiple of time_step.")
+        raise RuntimeError("Variable dt_insert should be a multiple of time_step.")
 
     # Reading the inlet geometry and normal to the inlet condition
     coord_list = np.load(os.path.join(output_path, "inletPython.npy"))
@@ -204,14 +207,14 @@ def inlet_modelling(config):
     # Initialize inlet model class
     inlet_model = InletModel(config, coord_list, normal_inlet)
 
+
     probabilityShapes = [1.0]
     if np.sum(probabilityShapes) != 1.0:
         sys.exit('Vector "probabilityShapes" indicating the probability of occurrence of bubble shapes has not been defined correctly.')
 
     # The random generator selects:
     # - the bubble shape definition (shapeID)
-    # - the center point of a bubble, both in
-    # - inlet plane and in time
+    # - the center point of a bubble, both in inlet plane and in time
     # - the bubble mass
     n_time_insert = int((t_end-t_start)/dt_insert) + 1
     logger.info(f"Between t_start {t_start} s and t_end {t_end} s, {n_time_insert} intervals of {dt_insert} s need to be defined.")
