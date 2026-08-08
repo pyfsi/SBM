@@ -45,6 +45,19 @@ class InletModel():
         self.velocity = velocity
         self.alpha = alpha
 
+    def sample_bubble_coord(self, x_bounds, t_bounds, m_bounds):
+        # sample cell index for spatial coordinates
+        x_cell_idx = random.randint(x_bounds[0], x_bounds[1])
+
+        # sample cell index for temporal coordinates
+        t_cell_idx = random.randint(t_bounds[0], t_bounds[1])
+
+        # sample bubble mass
+        mg_bubble = random.uniform(m_bounds[0], m_bounds[1])
+
+        return x_cell_idx, t_cell_idx, mg_bubble
+
+
     def define_bubble(self, C_ID, C_t, t, shapeID, mg_bubble):
 
         t_start = self.t_start
@@ -52,13 +65,11 @@ class InletModel():
         dt = self.dt
         dt_insert = self.dt_insert
         rhog = self.rhog
-        rhol = self.rhol
         velocity_bc = self.velocity_bc
         intersect_boundary = self.intersect_boundary
         intersect_bubble = self.intersect_bubble
         coord_list = self.coord_list
         normal_inlet = self.normal_inlet
-        n_time_step = int((t_end - t_start)/dt)+1
 
         # temporary storage arrays (must be np.array)
         velocity_temp = np.array(self.velocity)
@@ -73,12 +84,9 @@ class InletModel():
             radius_gas = ((3.0*mg_bubble)/(4.0*PI*rhog))**(1.0/3.0)
 
             time_loc = C_time - t_start - int((C_time-t_start)/dt_insert) * dt_insert
-            # Checks below prevents intersection with start and end of t_unit domain TODO
+            # Checks below prevents intersection with start and end of t_unit domain
             intersect_with_start = C_time < radius_gas/velocity_bc
             intersect_with_end = C_time > (t_end-radius_gas/velocity_bc)
-
-            #intersect_with_start = time_loc < radius_gas/velocity_bc
-            #intersect_with_end = time_loc > (dt_insert-radius_gas/velocity_bc)
             if intersect_with_start:
                 return False, 0.0
             if intersect_with_end:
@@ -147,13 +155,13 @@ class InletModel():
         # iterate until mass of inserted gas within tolerance of target mass
         while abs(mg_per_insert-mg_inserted) > (tol_mg):
             shapeID = 0 #random.randint(0, N_SHAPES - 1)  # randomly select bubble shape
-            # sample centerpoint location
-            C_ID = random.randint(0, n_inlet_cells)
-            # sample centerpoint time location
-            C_t = random.randint(C_t_min, C_t_max)
-            # sample bubble mass
-            mg_bubble = random.uniform(min((mgb_min, mg_per_insert - mg_inserted)),
-                                        min((mgb_max, mg_per_insert - mg_inserted)))
+
+            # calculate bounds for bubble sampling
+            x_bounds = [0, n_inlet_cells]
+            t_bounds = [C_t_min, C_t_max]
+            m_bounds = [min((mgb_min, mg_per_insert - mg_inserted)),
+                                        min((mgb_max, mg_per_insert - mg_inserted))]
+            C_ID, C_t, mg_bubble = self.sample_bubble_coord(x_bounds, t_bounds, m_bounds)
 
             is_bubble_defined, mg_defined = self.define_bubble(C_ID, C_t, t_insert_idx, shapeID, mg_bubble)
 
