@@ -87,31 +87,31 @@ def read_inlet_openfoam(config):
                 tempCoordFile[j, 0] = unifValue
 
         if i == 0:
-            coord_list = np.ones([rowsNr, 5]) * float("inf")  # ID - X - Y - Z - Area
-            coord_list[:, 0] = np.arange(rowsNr)
+            face_list = np.ones([rowsNr, 5]) * float("inf")  # ID - X - Y - Z - Area
+            face_list[:, 0] = np.arange(rowsNr)
 
-        coord_list[:, (i + 1)] = tempCoordFile[:, 0]
+        face_list[:, (i + 1)] = tempCoordFile[:, 0]
 
 
     # Check that all values are inserted correctly
     for i in np.arange(rowsNr):
         for j in np.arange(5):
-            if coord_list[i, j] > 1e15:
+            if face_list[i, j] > 1e15:
                 sys.exit("Not all values are correctly read into the Python-script 'TubeBundle_ReadInlet'")
     logger.info("Completed loading of cell coordinates and face areas into Python.")
 
     # Calculate inlet normal
     logger.info("Calculating inlet normals.")
     if dimension == 3:
-        point1 = coord_list[0, 1:4]
-        point2 = coord_list[1, 1:4]
+        point1 = face_list[0, 1:4]
+        point2 = face_list[1, 1:4]
         i = 2
-        point3 = coord_list[i, 1:4]
+        point3 = face_list[i, 1:4]
         enum = np.linalg.norm(np.cross(point2 - point1, point3 - point1))
         denom = (np.linalg.norm(point2 - point1) * np.linalg.norm(point3 - point1))
         while (enum / denom) < TOLERANCE:
             i = i + 1
-            point3 = coord_list[i, 1:4]
+            point3 = face_list[i, 1:4]
             enum = np.linalg.norm(np.cross(point2 - point1, point3 - point1))
             denom = (np.linalg.norm(point2 - point1) * np.linalg.norm(point3 - point1))
 
@@ -160,7 +160,7 @@ def read_inlet_openfoam(config):
     logger.info(f"Completed calculating normal to the inlet, pointing into the domain: {normal_inlet}")
 
     # Save inlet and normal in Python Numpy-array format
-    np.save(os.path.join(output_path, "inletPython.npy"), coord_list)
+    np.save(os.path.join(output_path, "inletPython.npy"), face_list)
     np.save(os.path.join(output_path, "normalInletPython.npy"), normal_inlet)
 
     logger.info("========================End read_inlet_openfoam========================")
