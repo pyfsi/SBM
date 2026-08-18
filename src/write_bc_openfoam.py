@@ -77,7 +77,6 @@ def write_time_step(i, args):
     write_footer(VOFw_out_path)
 
 def write_bc_openfoam(config):
-    logger.info("========================Start write_bc_openfoam========================")
     print(f"Running write_bc_openfoam")
 
     # config variables
@@ -196,4 +195,3 @@ def write_bc_openfoam(config):
         shutil.move(area_path, output_path)
 
     logger.info("Finished writing boundary condition to folder 'boundaryData'.")
-    logger.info("========================End write_bc_openfoam========================")

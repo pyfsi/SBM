@@ -5,7 +5,6 @@ logger = logging.getLogger(__name__)
 TOLERANCE = 0.01
 
 def read_inlet_openfoam(config):
-    logger.info("========================Start read_inlet_openfoam========================")
     print(f"Running read_inlet_openfoam")
 
     # alias for config variables
@@ -162,5 +161,3 @@ def read_inlet_openfoam(config):
     # Save inlet and normal in Python Numpy-array format
     np.save(os.path.join(output_path, "inletPython.npy"), face_list)
     np.save(os.path.join(output_path, "normalInletPython.npy"), normal_inlet)
-
-    logger.info("========================End read_inlet_openfoam========================")

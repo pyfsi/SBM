@@ -22,6 +22,11 @@ import scienceplots
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
+# profiling
+import tracemalloc
+from contextlib import contextmanager
+
+# matplotlib settings
 # plt.style.use('science')
 plt.rcParams["figure.figsize"] = (20,20)
 plt.rcParams.update({
@@ -81,3 +86,37 @@ def get_openfoam_type(cfd_version: str) -> str:
 
     raise ValueError("The cfd_version variable is unknown for OpenFOAM. \
                      Use the format [v2312-foss-2023a] for com or [11-foss-2023a] for org version")
+
+
+def is_inside(val: float, min: float, max: float) -> bool:
+    return (min < val) & (val < max)
+
+one_kibibyte = 1 << 10
+one_mebibyte = 1 << 20
+one_gibibyte = 1 << 30
+mem_unit_size = one_mebibyte
+@contextmanager
+def memory_profile(logger, func_name: str):
+    tracemalloc.start()
+
+    yield
+
+    current, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    # choose memory unit for printing
+    if is_inside(peak, min=one_gibibyte, max=100*one_gibibyte):
+        mem_unit = "GiB"
+        mem_unit_size = one_gibibyte
+    elif is_inside(peak, min=one_mebibyte, max=one_gibibyte):
+        mem_unit = "MiB"
+        mem_unit_size = one_mebibyte
+    elif is_inside(peak, min=0, max=one_mebibyte):
+        mem_unit = "KiB"
+        mem_unit_size = one_kibibyte
+    else:
+        mem_unit = "GiB"
+        mem_unit_size = one_gibibyte
+
+    logger.info(f"{func_name} memory allocation in [{mem_unit}]")
+    logger.info(f"\t Peak = {peak / mem_unit_size:,.3f}; Final = {current / mem_unit_size:,.3f}")

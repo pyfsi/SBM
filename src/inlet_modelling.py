@@ -1,4 +1,6 @@
-from utils import np, sys, os, random, PI, SBM_OUTPUT, logging
+from utils import np, sys, os, random, logging
+from utils import PI, SBM_OUTPUT
+
 logger = logging.getLogger(__name__)
 
 class InletModel():
@@ -10,7 +12,6 @@ class InletModel():
         self.timestep_size = float(config["cfd"]["delta_time"])
         self.block_size = float(config["sbm"]["t_unit"])
         self.density_gas = float(config["cfd"]["rho_g"])
-        # self.rhol = float(config["cfd"]["rho_l"])
         self.mg_per_block = float(config["sbm"]["mass_gas"])
         self.tol_mg = float(config["sbm"]["mass_gas_tol"])
         self.velocity_bc = float(config["sbm"]["velocity"])
@@ -70,16 +71,16 @@ class InletModel():
         alpha_temp = np.array(self.alpha)
 
         bubble_coord = face_list[face_idx, :]
-        cell_time = time[time_idx]
-        bubble_center = bubble_coord[1:4] - (velocity_bc * cell_time) * normal_inlet[:]
+        bubble_time = time[time_idx]
+        bubble_center = bubble_coord[1:4] - (velocity_bc * bubble_time) * normal_inlet[:]
 
         # calculate gas radius assuming spherical bubble
         radius_gas = ((3.0*bubble_mass)/(4.0*PI*density_gas))**(1.0/3.0)
 
-        rel_cell_time = cell_time - t_start - int((cell_time-t_start)/block_size) * block_size
+        rel_cell_time = bubble_time - t_start - int((bubble_time-t_start)/block_size) * block_size
         # Checks below prevents intersection with start and end of t_unit domain
-        intersect_with_start = cell_time < radius_gas/velocity_bc
-        intersect_with_end = cell_time > (t_end-radius_gas/velocity_bc)
+        intersect_with_start = bubble_time < radius_gas/velocity_bc
+        intersect_with_end = bubble_time > (t_end-radius_gas/velocity_bc)
         if intersect_with_start:
             return False, 0.0
         if intersect_with_end:
@@ -173,7 +174,6 @@ class InletModel():
         return mg_inserted
 
 def inlet_modelling(config):
-    logger.info("========================Start inlet_modelling========================")
     print(f"Running inlet_modelling")
 
     # configuration
@@ -252,5 +252,3 @@ def inlet_modelling(config):
                         str(toWrite[fi][i, j]) + '\n')
         f.close()
     logger.info("Inlet profile saved to CSV-files.")
-
-    logger.info("========================End inlet_modelling========================")
