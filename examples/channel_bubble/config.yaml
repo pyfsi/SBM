@@ -16,16 +16,10 @@ cfd:
 sbm:
   seed: 1                     # Seed for random. Set to None for pseudo-RNG. Type (int, float, str, bytes, and bytearray) possible as seed.
   t_unit: 0.01                # Interval for bubble insertion
-  mass_gas: 5e-8              # Mass of gas to be introduced
+  mass_gas: 1e-7              # Mass of gas to be introduced
   mass_bubble_min:  5e-9      # min mass of single bubble to be inserted. Recommendation: 10% of mass_gas
   mass_bubble_max:  1e-8      # max mass of single bubble to be inserted. Recommendation: 20% of mass-gas
   mass_gas_tol:  1e-9         # Tolerance on the gas mass to be introduced in domain over a time 'tunit'
   velocity:         1         # Velocity of the mixture  to be introduced in domain
   intersect_boundary: True    # Allows bubbles to instersect domain boundary
   intersect_bubble: True      # Allows bubbles to intersect each other
-fluent:
-  max_nodes_per_face: 4
-  time_step_start: 0
-  n_time_steps: 50000
-  case_name:  second_test.cas.h5
-  cores:  4
