@@ -1,0 +1,17 @@
+forces
+{
+	type forces;
+	libs ("libforces.so");
+	patches (cylinder);
+	CofR	(0.005 0.005 0.025);
+	writeFields	false;
+
+	enabled true;
+	log true;
+
+	timeStart 0;
+	executeControl timeStep;
+	executeInterval 1;
+	writeControl timeStep;
+	writeInterval 1;
+}
