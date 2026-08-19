@@ -3,7 +3,6 @@
 **/boundaryData/*
 .idea/*
 .vscode/*
-examples/*
 
 # ignore python caches
 **/__pycache__/*

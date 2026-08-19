@@ -1,0 +1,67 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     |
+    \\  /    A nd           | Web:      www.OpenFOAM.com
+     \\/     M anipulation  |
+-------------------------------------------------------------------------------
+Description
+    Writes out values of fields from cells nearest to specified locations.
+
+\*---------------------------------------------------------------------------*/
+surfaces
+{
+    type            surfaces;
+    libs            ("libsampling.so");
+
+    //executeControl  writeTime;
+    //executeInterval 1;
+
+    writeControl    timeStep; //timeStep OR writeTime
+    writeInterval   10;
+
+    surfaceFormat   vtk;
+	
+	formatOptions
+	{
+		vtk
+		{
+			legacy true;
+			format ascii;
+		} 
+	}
+	
+    fields          (p U alpha.Water);
+
+    interpolationScheme cellPoint;
+
+    surfaces
+    {
+        inlet
+        {
+            type        patch;
+	    patches     (inlet);
+            interpolate true;
+	    surfaceFormat  ensight;
+        }
+
+	center
+	{
+	    type	cuttingPlane;
+	    point	(0.005 0.005 0.02);
+	    normal	(0 0 1);
+	    interpolate 	true;
+	    surfaceFormat	ensight;		
+	}
+
+        half_plane
+        {
+            type        cuttingPlane;
+            point       (0.005 0.005 0);
+            normal      (0 1 0);
+            interpolate true;
+	    surfaceFormat  ensight;
+        }
+    };
+}
+// ************************************************************************* //

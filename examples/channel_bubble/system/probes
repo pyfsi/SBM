@@ -1,0 +1,48 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     |
+    \\  /    A nd           | Web:      www.OpenFOAM.com
+     \\/     M anipulation  |
+-------------------------------------------------------------------------------
+Description
+    Writes out values of fields from cells nearest to specified locations.
+
+\*---------------------------------------------------------------------------*/
+probes
+{
+    type            probes;
+    libs            ("libsampling.so");
+
+    // Name of the directory for probe data
+    name            probes;
+
+    // execution config
+    executeControl  timeStep;
+    executeInterval 1;
+
+    // Write at same frequency as fields
+    writeControl    timeStep;
+    writeInterval   1;
+
+    enabled             true;
+    log                 true;
+
+    fields          (p U "alpha.Water");
+
+    probeLocations
+    (
+	(0.005 0.005 0.01)
+	(0.005 0.005 0.025)
+	(0.005 0.005 0.04)
+	(0.0025 0.005 0.025)
+	(0.0075 0.005 0.025)
+	(0.005 0.0025 0.025)
+	(0.005 0.0075 0.025)
+    );
+
+    // Optional: filter out points that haven't been found. Default
+    //           is to include them (with value -VGREAT)
+    includeOutOfBounds  true;
+}
+// ************************************************************************* //
