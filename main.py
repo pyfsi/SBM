@@ -5,11 +5,11 @@
 # The values for the boundary condition are then written by running the third script ("write_bc_<solver>.py")
 
 from utils import os, yaml, shutil, logging
-from utils import get_openfoam_type
+from utils import get_openfoam_type, memory_profile
 from utils import SBM_OUTPUT
 import cProfile
-logger = logging.getLogger(__name__)
 
+logger = logging.getLogger(__name__)
 
 def main(config):
     # define config variables
@@ -26,14 +26,16 @@ def main(config):
         print(f"Deleting previous SBM output files.")
     os.mkdir(sbm_out_path)
 
+    # start logging
     log_path = os.path.join(sbm_out_path, "sbm.log")
     logging.basicConfig(filename=log_path, level=logging.INFO)
-    logger.info("++++++++++Synthetic Bubble Model start++++++++++")
+    logger.info("++++++++++Start Synthetic Bubble Model++++++++++")
 
     # check if cfd program is defined
     if (cfd_program.lower() != "openfoam") & (cfd_program.lower() != "ansys_cfd"):
         raise RuntimeError("CFD program type not found. It should be either OpenFOAM or ANSYS_CFD")
 
+    # delete boundary data if allowed
     if purge_boundary_data:
         boundary_data_path = os.path.join(case_path, "constant", "boundaryData")
         if os.path.exists(boundary_data_path):
@@ -47,37 +49,45 @@ def main(config):
         create_postprocess_functions(config)
 
     # Read CFD inlet data
-    if cfd_program.lower() == "openfoam":
-        from src.read_inlet_openfoam import read_inlet_openfoam
-        read_inlet_openfoam(config)
-    elif cfd_program.lower() == "ansys_cfd":
-        from src.read_inlet_ansyscfd import read_inlet_ansyscfd
-        read_inlet_ansyscfd(config)
-    else:
-        raise RuntimeError("CFD program type not found. It should be either OpenFOAM or ANSYS_CFD")
+    logger.info("========================Start read_inlet========================")
+    with memory_profile(logger, func_name="read_inlet"):
+        if cfd_program.lower() == "openfoam":
+            from src.read_inlet_openfoam import read_inlet_openfoam
+            read_inlet_openfoam(config)
+        elif cfd_program.lower() == "ansys_cfd":
+            from src.read_inlet_ansyscfd import read_inlet_ansyscfd
+            read_inlet_ansyscfd(config)
+        else:
+            raise RuntimeError("CFD program type not found. It should be either OpenFOAM or ANSYS_CFD")
+    logger.info("========================End read_inlet========================")
 
-    # calculate inlet boundary conditions
+    # model inlet boundary conditions
+    logger.info("========================Start inlet_modelling========================")
     from src.inlet_modelling import inlet_modelling
-    inlet_modelling(config)
+    with memory_profile(logger, func_name="inlet_modelling"):
+        inlet_modelling(config)
+    logger.info("========================End inlet_modelling========================")
 
     # Write output
-    if cfd_program.lower() == "openfoam":
-        from src.write_bc_openfoam import write_bc_openfoam
-        write_bc_openfoam(config)
-    elif cfd_program.lower() == "ansys_cfd":
-        from src.write_bc_ansyscfd import write_bc_ansyscfd
-        write_bc_ansyscfd(config)
-    else:
-        raise RuntimeError("CFD program type not found. It should be either OpenFOAM or ANSYS_CFD")
+    logger.info("========================Start write_bc========================")
+    with memory_profile(logger, func_name="write_bc"):
+        if cfd_program.lower() == "openfoam":
+            from src.write_bc_openfoam import write_bc_openfoam
+            write_bc_openfoam(config)
+        elif cfd_program.lower() == "ansys_cfd":
+            from src.write_bc_ansyscfd import write_bc_ansyscfd
+            write_bc_ansyscfd(config)
+        else:
+            raise RuntimeError("CFD program type not found. It should be either OpenFOAM or ANSYS_CFD")
+    logger.info("========================End write_bc========================")
 
-    logger.info("++++++++++Synthetic Bubble Model end++++++++++")
+    logger.info("++++++++++End Synthetic Bubble Model++++++++++")
 
 if __name__=='__main__':
-
     # read configuration file
     config_path = os.path.join(os.getcwd(), "config.yaml")
-    with open(config_path, "r") as f:
-        config = yaml.load(f, Loader=yaml.SafeLoader)
+    with open(config_path, "r") as conf_f:
+        config = yaml.load(conf_f, Loader=yaml.SafeLoader)
     profile_run = config.get("profile_run", False)
 
     if profile_run:
@@ -87,4 +97,4 @@ if __name__=='__main__':
     else:
         main(config)
 
-    print(f"SBM script ended succesfully. See 'sbm.log' for more details.")
+    print(f"SBM script ended succesfully. See 'sbm.log' in 'sbm_files' for more details.")

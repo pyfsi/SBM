@@ -1,164 +1,190 @@
-# This script was developed to make a new type of inlet modelling, specifically designed for tube bundle geometries
-# but not limited hereto. In this script, (large) bubble shapes are first defined by the user, then randomly selected
-# to give a certain mass flux over a unit time and finally written to an appropriate format to serve as a transient
-# inlet model for CFD calculations. This script is called automatically by the masterscript 'TubeBundle_master.sh',
-# so the user input is channeled to this python script from the bash-script directly.
+from utils import np, sys, os, random, logging
+from utils import PI, SBM_OUTPUT
 
-from utils import np, sys, os, random, PI, SBM_OUTPUT, logging
 logger = logging.getLogger(__name__)
 
-# constants
-N_SHAPES = 1
-
 class InletModel():
-    def __init__(self, config, coordList, normalInlet):
+    def __init__(self, config, face_list, normal_inlet):
 
         # configuration
-        self.startTime = float(config["cfd"]["start_time"])
-        self.endTime = float(config["cfd"]["end_time"])
-        self.timeStepSize = float(config["cfd"]["delta_time"])
-        self.tunit = float(config["sbm"]["t_unit"])
-        self.rhog = float(config["cfd"]["rho_g"])
-        self.rhol = float(config["cfd"]["rho_l"])
-        self.mg_tunit = float(config["sbm"]["mass_gas"])
+        self.t_start = float(config["cfd"]["start_time"])
+        self.t_end = float(config["cfd"]["end_time"])
+        self.timestep_size = float(config["cfd"]["delta_time"])
+        self.block_size = float(config["sbm"]["t_unit"])
+        self.density_gas = float(config["cfd"]["rho_g"])
+        self.mg_per_block = float(config["sbm"]["mass_gas"])
         self.tol_mg = float(config["sbm"]["mass_gas_tol"])
-        self.velocity = float(config["sbm"]["velocity"])
-        # self.mgb_min = float(config["sbm"]["mass_bubble_min"])
-        # self.mgb_max = float(config["sbm"]["mass_bubble_max"])
-        self.intersectBoundary = config["sbm"]["intersect_boundary"]
-        self.intersectBubble = config["sbm"]["intersect_bubble"]
+        self.velocity_bc = float(config["sbm"]["velocity"])
+        self.mg_min = float(config["sbm"]["mass_bubble_min"])
+        self.mg_max = float(config["sbm"]["mass_bubble_max"])
+        self.intersect_boundary = config["sbm"]["intersect_boundary"]
+        self.intersect_bubble = config["sbm"]["intersect_bubble"]
 
         # inlet geometry information
-        self.coordList = coordList
-        self.normalInlet = normalInlet
+        self.face_list = face_list # ID - X - Y - Z - Area
+        self.normal_inlet = normal_inlet
 
         # store previous bubble centers for next time step
         self.prev_centers = []
 
         # Initializing velocity and phase fraction arrays
-        nTimeSteps = int((self.endTime - self.startTime)/self.timeStepSize)+1 # Plus 1 because first time step is included - last time step is not included.
-        self.UVal = np.ones([len(coordList), nTimeSteps, 3])  # initially: "pre-inlet domain" at constant velocity
-        self.UVal[:, :, 0] = self.velocity * normalInlet[0]
-        self.UVal[:, :, 1] = self.velocity * normalInlet[1]
-        self.UVal[:, :, 2] = self.velocity * normalInlet[2]
-        self.VOFwVal = np.ones([len(coordList), nTimeSteps+1, 1])  # "pre-inlet domain" filled with water
-        self.timeVal = np.arange(self.startTime, self.endTime+self.timeStepSize, self.timeStepSize)  # list of flow times to be defined in this model
+        n_time_step = int((self.t_end - self.t_start)/self.timestep_size)+1
+        self.velocity = np.ones([len(face_list), n_time_step, 3])
+        self.velocity[:, :, 0] = self.velocity_bc * normal_inlet[0]
+        self.velocity[:, :, 1] = self.velocity_bc * normal_inlet[1]
+        self.velocity[:, :, 2] = self.velocity_bc * normal_inlet[2]
+        self.alpha = np.ones([len(face_list), n_time_step, 1])
+        self.time = np.linspace(self.t_start, self.t_end+self.timestep_size, n_time_step)
 
-    def update(self, UVal, VOFwVal):
-        self.UVal = UVal
-        self.VOFwVal = VOFwVal
+    def update(self, velocity, alpha):
+        self.velocity = velocity
+        self.alpha = alpha
 
-    def define_bubble(self, C_ID, C_t, t, shapeID, mg_bubble):
+    def sample_bubble_coord(self, face_idx_bounds, time_idx_bounds, bubble_mass_bounds):
+        # sample cell index for spatial coordinates
+        face_idx = random.randint(face_idx_bounds[0], face_idx_bounds[1])
 
-        startTime = self.startTime
-        endTime = self.endTime
-        timeStepSize = self.timeStepSize
-        tunit = self.tunit
-        rhog = self.rhog
-        rhol = self.rhol
-        velocity = self.velocity
-        intersectBoundary = self.intersectBoundary
-        intersectBubble = self.intersectBubble
-        coordList = self.coordList
-        normalInlet = self.normalInlet
+        # sample cell index for temporal coordinates
+        time_idx = random.randint(time_idx_bounds[0], time_idx_bounds[1])
 
-        # temporary storage arrays
-        UVal_temp = np.array(self.UVal)
-        VOFwVal_temp = np.array(self.VOFwVal)
+        # sample bubble mass
+        bubble_mass = random.uniform(bubble_mass_bounds[0], bubble_mass_bounds[1])
 
-        C_coord = coordList[C_ID, :]
-        C_time = self.timeVal[C_t]
-        if shapeID > (N_SHAPES-1):
-            raise RuntimeError("ShapeID is not within the range 0 to N_SHAPES-1.")
+        return face_idx, time_idx, bubble_mass
 
-        # For every bubble, define different requirements for the cell center location and for the scaling factor,
-        # which - if not met - causes the end of the current function call. However, always make sure that you have at least
-        # one bubble shape that can define a bubble sufficiently small to fall within the set tolerance tol_mg (see further)
-        # of the desired amount of gas mg_tunit.
-        if shapeID == 0:
-            radius_gas = ((3.0*mg_bubble)/(4.0*PI*rhog))**(1.0/3.0)
+    def define_bubble(self, face_idx, time_idx, block_idx, bubble_mass):
 
-            # If desired, check that the center point denoted by C_ID and C_t follows a certain set of requirements
-            C_checked = True
-            timeLoc = C_time - startTime - int((C_time-startTime)/tunit) * tunit  # how many seconds compared to start t_unit
+        t_start = self.t_start
+        t_end = self.t_end
+        timestep_size = self.timestep_size
+        block_size = self.block_size
+        density_gas = self.density_gas
+        velocity_bc = self.velocity_bc
+        intersect_boundary = self.intersect_boundary
+        intersect_bubble = self.intersect_bubble
+        face_list = self.face_list
+        normal_inlet = self.normal_inlet
+        time = self.time
 
-            # Checks below prevents intersection with beginning of t_unit domain
-            if timeLoc < radius_gas/velocity:
-                C_checked = False
-            if timeLoc > (tunit-radius_gas/velocity):
-                C_checked = False
-            if not(C_checked):  # Position of the bubble center (C_ID,C_t) is not OK.
+        # temporary storage arrays (must be np.array)
+        velocity_temp = np.array(self.velocity)
+        alpha_temp = np.array(self.alpha)
+
+        bubble_coord = face_list[face_idx, :]
+        bubble_time = time[time_idx]
+        bubble_center = bubble_coord[1:4] - (velocity_bc * bubble_time) * normal_inlet[:]
+
+        # calculate gas radius assuming spherical bubble
+        radius_gas = ((3.0*bubble_mass)/(4.0*PI*density_gas))**(1.0/3.0)
+
+        rel_cell_time = bubble_time - t_start - int((bubble_time-t_start)/block_size) * block_size
+        # Checks below prevents intersection with start and end of t_unit domain
+        intersect_with_start = bubble_time < radius_gas/velocity_bc
+        intersect_with_end = bubble_time > (t_end-radius_gas/velocity_bc)
+        if intersect_with_start:
+            return False, 0.0
+        if intersect_with_end:
+            return False, 0.0
+
+        mg_defined = 0.0
+        mg_bubble_wall = 0.0
+
+        # get space and time index (i and j) of bounding box
+        is_inside_bubble = np.linalg.norm(face_list[:, 1:4] - bubble_coord[1:4], axis=1) < radius_gas
+        face_idx_in_bubble = is_inside_bubble.nonzero()[0]
+        min_rel_time_idx_in_bubble = int((rel_cell_time - radius_gas/velocity_bc)/timestep_size)
+        temp = (rel_cell_time + radius_gas/velocity_bc) // timestep_size
+        max_rel_time_idx_in_bubble = int(temp) + 1
+
+        # convert from relative time idx
+        min_time_idx_in_bubble = block_idx * int(block_size / timestep_size) + min_rel_time_idx_in_bubble
+        max_time_idx_in_bubble = block_idx * int(block_size / timestep_size) + max_rel_time_idx_in_bubble
+
+        n_true_flag = 0
+        for i in face_idx_in_bubble:
+            cell_area = face_list[i, 4]
+            for j in range(min_time_idx_in_bubble, max_time_idx_in_bubble):
+                cell_coord = face_list[i, 1:4] - (velocity_bc * time[j]) * normal_inlet[:]
+                if np.linalg.norm(cell_coord-bubble_center) < radius_gas:
+                    if self.alpha[i, j, 0] == 1.0:
+                        alpha_temp[i, j, 0] = 0.0
+                        velocity_temp[i, j, :] = velocity_bc * normal_inlet[:]
+
+                        mg_defined += cell_area * velocity_bc * timestep_size * density_gas
+                        mg_bubble_wall += cell_area * velocity_bc * timestep_size * density_gas
+
+                        n_true_flag += 1
+                    elif intersect_bubble:
+                        mg_bubble_wall += cell_area * velocity_bc * timestep_size * density_gas
+                    else:
+                        return False, 0.0
+
+        if not(intersect_boundary):
+            if mg_bubble_wall < (bubble_mass-np.average(face_list[:, 4])*velocity_bc*timestep_size):
                 return False, 0.0
 
-            # Check for each element in the VOFwVal[:, :, 0] whether it's in the bubble to be defined and whether this
-            # bubble does not intersect with a previously defined gas bubble. If no old bubble is intersected, change the
-            # element VOFwVal and UVal to the appropriate-value; this will be stored in the temporary matrices which will be
-            # checked afterwards before updating VOFwVal and UVal
-            # Concurrently, integrate the mass of gas you have introduced in the domain.
-            mg_checked = 0.0
-            mg_bubbleWall = 0.0
-            coordCenter = np.array([C_coord[1] - (velocity * C_time) * normalInlet[0],
-                                    C_coord[2] - (velocity * C_time) * normalInlet[1],
-                                    C_coord[3] - (velocity * C_time) * normalInlet[2]])
+        # Save temporary data to class variable data
+        self.update(velocity_temp, alpha_temp)
 
-            i_mask = np.linalg.norm(coordList[:, 1:4] - C_coord[1:4], axis=1) < radius_gas
-            i_list = i_mask.nonzero()[0]
-            j_min = int((timeLoc - radius_gas/velocity)/timeStepSize)
-            temp = (timeLoc + radius_gas/velocity) // timeStepSize
-            j_max = int(temp) + 1
+        return True, mg_defined
 
-            # nested loop could maybe be eliminated by vectorization: boolean arithmetic on the matrices
-            n_true_flag = 0
-            for i in i_list:
-                for j in range(j_min, j_max):
-                    time_id = t * int(tunit / timeStepSize) + j
-                    coordPoint = np.array(
-                        [coordList[i, 1] - (velocity * self.timeVal[t * int(tunit / timeStepSize) + j]) * normalInlet[0],
-                        coordList[i, 2] - (velocity * self.timeVal[t * int(tunit / timeStepSize) + j]) * normalInlet[1],
-                        coordList[i, 3] - (velocity * self.timeVal[t * int(tunit / timeStepSize) + j]) * normalInlet[2]])
-                    if np.linalg.norm(coordPoint-coordCenter) < radius_gas:
-                        if self.VOFwVal[i, t * int(
-                                tunit / timeStepSize) + j, 0] == 1.0:  # Every cell not yet occupied by bubble
-                            VOFwVal_temp[i, t * int(tunit / timeStepSize) + j, 0] = 0.0
-                            UVal_temp[i, t * int(tunit / timeStepSize) + j, 0] = velocity * normalInlet[0]
-                            UVal_temp[i, t * int(tunit / timeStepSize) + j, 1] = velocity * normalInlet[1]
-                            UVal_temp[i, t * int(tunit / timeStepSize) + j, 2] = velocity * normalInlet[2]
-                            mg_checked += coordList[i, 4] * velocity * timeStepSize * rhog
-                            mg_bubbleWall = mg_bubbleWall + coordList[i, 4] * velocity * timeStepSize * rhog
-                            n_true_flag += 1
-                        elif intersectBubble:
-                            mg_bubbleWall = mg_bubbleWall + coordList[
-                                i, 4] * velocity * timeStepSize * rhog  # In this case, a cell was already filled with air, but I will add the mass of air to mg_bubbleWall to be able to check later whether a wall was intersected.
-                        else:
-                            return False, 0.0
+    def insert_bubbles(self, block_idx) -> float:
+        # aliases
+        mg_per_block = self.mg_per_block
+        tol_mg = self.tol_mg
+        face_list = self.face_list
+        block_size = self.block_size
+        timestep_size = self.timestep_size
+        mg_min = self.mg_min
+        mg_max = self.mg_max
 
-        # Check mass of gas added to the domain: in case intersection with boundary is not allowed (intersectBoundary=False)
-        if not(intersectBoundary):
-            if mg_bubbleWall < (mg_bubble-np.average(coordList[:, 4])*velocity*timeStepSize):
-                return False, 0.0
+        timesteps_per_block = int(block_size / timestep_size)
+        min_time_at_blockidx = block_idx * timesteps_per_block
+        max_time_at_blockidx = (block_idx + 1) * timesteps_per_block - 1
+        n_inlet_faces = len(face_list) - 1
 
-        # Save temporary files to permanent files
-        self.update(UVal_temp, VOFwVal_temp)
+        iter = 0
+        mg_inserted = 0.0
+        # iterate until mass of inserted gas within tolerance of target mass
+        while abs(mg_per_block-mg_inserted) > (tol_mg):
+            # calculate bounds for bubble sampling
+            face_idx_bounds = [0, n_inlet_faces]
+            time_idx_bounds = [min_time_at_blockidx, max_time_at_blockidx]
+            bubble_mass_bounds = [
+                min((mg_min, mg_per_block - mg_inserted)),
+                min((mg_max, mg_per_block - mg_inserted))
+            ]
 
-        return True, mg_checked
+            face_idx, time_idx, bubble_mass = self.sample_bubble_coord(face_idx_bounds, time_idx_bounds, bubble_mass_bounds)
+            is_bubble_defined, mg_defined = self.define_bubble(face_idx, time_idx, block_idx, bubble_mass)
+
+            # print for debugging
+            # residual = mg_per_block-mg_inserted
+            # print(f"\t bubble_mass {bubble_mass:.3e} \t Residual {residual:.3e}")
+
+            if is_bubble_defined:
+                mg_inserted += mg_defined
+                iter = 0
+            else:
+                iter = iter+1
+
+            if iter > 1000:
+                raise RuntimeError("inlet_modelling took longer than 1000 iterations.")
+
+        return mg_inserted
 
 def inlet_modelling(config):
-    logger.info("========================Start inlet_modelling========================")
     print(f"Running inlet_modelling")
 
     # configuration
-    casePath = os.getcwd()
-    startTime = float(config["cfd"]["start_time"])
-    endTime = float(config["cfd"]["end_time"])
-    timeStepSize = float(config["cfd"]["delta_time"])
-    tunit = float(config["sbm"]["t_unit"])
-    mg_tunit = float(config["sbm"]["mass_gas"])
-    tol_mg = float(config["sbm"]["mass_gas_tol"])
-    velocity = float(config["sbm"]["velocity"])
-    mgb_min = float(config["sbm"]["mass_bubble_min"])
-    mgb_max = float(config["sbm"]["mass_bubble_max"])
+    t_start = float(config["cfd"]["start_time"])
+    t_end = float(config["cfd"]["end_time"])
+    timestep_size = float(config["cfd"]["delta_time"])
+    block_size = float(config["sbm"]["t_unit"])
+    mg_per_block = float(config["sbm"]["mass_gas"])
+    velocity_bc = float(config["sbm"]["velocity"])
     seed = config["sbm"].get("seed", None)
-    output_path = os.path.join(casePath, SBM_OUTPUT)
+    output_path = os.path.join(os.getcwd(), SBM_OUTPUT)
 
     # set seed for random number generator
     if seed=="None":
@@ -168,111 +194,61 @@ def inlet_modelling(config):
     logging.info(seed_msg)
     random.seed(seed)
 
-    if int((endTime-startTime)/tunit) != ((endTime-startTime)/tunit):
-        sys.exit("The desired time interval (endTime - startTime) should be a multiple of tunit.")
-    if endTime <= startTime:
-        sys.exit("The endTime should be larger than the startTime.")
-    if (abs(int(tunit/timeStepSize) - tunit/timeStepSize) >= timeStepSize) and (abs((int(tunit/timeStepSize)+1) - tunit/timeStepSize) >= timeStepSize):
-        sys.exit("Variable tunit should be a multiple of timeStepSize.")
+    if int((t_end-t_start)/block_size) != ((t_end-t_start)/block_size):
+        raise RuntimeError("The desired time interval (t_end - t_start) should be a multiple of t_unit.")
+    if t_end <= t_start:
+        raise RuntimeError("The t_end should be larger than the t_start.")
+    if (abs(int(block_size/timestep_size) - block_size/timestep_size) >= timestep_size) and (abs((int(block_size/timestep_size)+1) - block_size/timestep_size) >= timestep_size):
+        raise RuntimeError("Variable block_size should be a multiple of time_step.")
 
     # Reading the inlet geometry and normal to the inlet condition
-    coordList = np.load(os.path.join(output_path, "inletPython.npy"))
-    normalInlet = np.load(os.path.join(output_path, "normalInletPython.npy"))
+    face_list = np.load(os.path.join(output_path, "inletPython.npy"))
+    normal_inlet = np.load(os.path.join(output_path, "normalInletPython.npy"))
 
-    # Initializing U and VOFw
-    # nTimeSteps = int((endTime-startTime)/timeStepSize)+1 # Plus 1 because first time step is included - last time step is not included.
-    # UVal = np.ones([len(coordList), nTimeSteps, 3])  # initially: "pre-inlet domain" at constant velocity
-    # for i in np.arange(3):
-    #     UVal[:, :, 0] = velocity*normalInlet[0]
-    #     UVal[:, :, 1] = velocity*normalInlet[1]
-    #     UVal[:, :, 2] = velocity*normalInlet[2]
-    # VOFwVal = np.ones([len(coordList), nTimeSteps+1, 1])  # "pre-inlet domain" filled with water
-    # timeVal = np.arange(startTime, endTime+timeStepSize, timeStepSize)  # list of flow times to be defined in this model
-    inlet_model = InletModel(config, coordList, normalInlet)
+    # Initialize inlet model class
+    inlet_model = InletModel(config, face_list, normal_inlet)
 
-    # Bubble shapes are defined as 1 function named "define_bubble", comprising a switch based on the shapeID of the bubble
-    # (each shape gets its own shapeID and is defined in another part of the switch)
-    # Input: centerpoint location cellID in coordList - time instant index in vector timeVal at which cell centre appears -
-    # integer 'timeInterval' denoting which time interval is being defined - shapeID-variable: what bubble shape you want to
-    # define - amount of mass of gas desired in bubble (scaling factor) - amount of gas in [0,tunit[ which still needs to be
-    # defined to get to mg_tunit
-    # Output: boolean indicating whether the randomly chosen centerpoint and bubble shape were compatible, if False no
-    # bubble will be defined.
-    probabilityShapes = [1.0] # probability distribution for shape function. sum of all elements must be 0
-    if np.sum(probabilityShapes) != 1.0:
-        sys.exit('Vector "probabilityShapes" indicating the probability of occurrence of bubble shapes has not been defined correctly.')
-
-    # Selecting bubble shapes based on user input
-    # The random generator selects randomly: the bubble shape definition (shapeID) - the center point of a bubble, both in
-    # inlet plane and in time (normal direction) - the amount of mass that bubble should have
-    # Distribution of the center points is random through entire inlet - restriction to center point location or mass of gas
-    # in bubble are defined in the bubble shapes.
-    nIntervals = int((endTime-startTime)/tunit)
-    logger.info(f"Between startTime {startTime} s and endTime {endTime} s, {nIntervals} intervals of {tunit} s need to be defined.")
-    for t in np.arange(nIntervals):
-        start_msg = f"Start bubble calculation for time interval {t}"
+    # The random generator selects:
+    # - the center point of a bubble, both in inlet plane and in time
+    # - the bubble mass
+    n_blocks = int((t_end-t_start)/block_size) + 1
+    logger.info(f"Between t_start {t_start} s and t_end {t_end} s, {n_blocks} intervals of {block_size} s need to be defined.")
+    for block_idx in range(n_blocks - 1): # no insertion at last time step
+        start_msg = f"Start bubble calculation for time interval {block_idx}"
         logger.info(start_msg)
         print(start_msg)
-        iter = 0
-        mg_defined = 0.0
-        # iterate until mass of inserted gas within tolerance of target mass
-        while abs(mg_tunit-mg_defined) > (tol_mg):
-            shapeID = random.randint(0, N_SHAPES - 1)  # randomly select bubble shape
-            # randomly select centerpoint location - determined by cell center ID (2D determined)
-            C_ID = random.randint(0, len(coordList) - 1)
-            # randomly select centerpoint time location - determined by time step index in timeVal (1D determined)
-            C_t = random.randint(t * int(tunit / timeStepSize),
-                                 (t + 1) * int(tunit / timeStepSize) - 1)
-            # randomly select a scale factor for the bubble
-            mg_bubble = random.uniform(min((mgb_min, mg_tunit - mg_defined)),
-                                       min((mgb_max, mg_tunit - mg_defined)))
-
-            is_bubble_defined, mg_checked = inlet_model.define_bubble(C_ID, C_t, t, shapeID, mg_bubble)
-            if is_bubble_defined:
-                mg_defined += mg_checked
-                iter = 0
-            else:
-                iter = iter+1
-                residual = mg_tunit-mg_defined
-                # print(f"\t mg_bubble {mg_bubble:.10f} \t Residual {residual:.10f}")
-            if iter > 1000:
-                raise RuntimeError("inlet_modelling took longer than 1000 iterations. Bubble generation with the current configuration file not possible.")
-
-        logger.info(f"\t Mass of inserted gas: {mg_defined} kg. (Target mass: {mg_tunit} kg).")
-
-    print("Inlet model iteration loop ended.")
+        mg_inserted = inlet_model.insert_bubbles(block_idx)
+        logger.info(f"\t Mass of inserted gas: {mg_inserted} kg. (Target mass: {mg_per_block} kg).")
     logger.info(f"Inlet model iteration loop ended.")
 
     # Writing the profile to be used in OpenFOAM
     logger.info("Saving inlet profile to Python (numpy) npy-files.")
-    # Matrix containing 'coordList' rows (#cell centers) and 'timeVal' columns (# time steps defined) - value of velocity
-    np.save(os.path.join(output_path, "inletDefinition-U.npy"), inlet_model.UVal)
-    # Matrix containing 'coordList' rows (#cell centers) and 'timeVal' columns (# time steps defined) - value of VOFw
-    np.save(os.path.join(output_path, "inletDefinition-VOFw.npy"), inlet_model.VOFwVal)
-    # List containing the time instants where U and alpha.water are defined
-    np.save(os.path.join(output_path, "inletDefinition-time.npy"), inlet_model.timeVal)
+    np.save(os.path.join(output_path, "inletDefinition-U.npy"), inlet_model.velocity)
+    np.save(os.path.join(output_path, "inletDefinition-VOFw.npy"), inlet_model.alpha)
+    np.save(os.path.join(output_path, "inletDefinition-time.npy"), inlet_model.time)
     logger.info("Inlet profile saved in Python (numpy) npy-files.")
 
-    # Check: convert to file compatible with ParaView to visualize your pre-inlet domain.
+    # Check: convert to file compatible with ParaView to visualize the pre-inlet domain.
     logger.info("Saving inlet profile to CSV-files. ")
-    files = [os.path.join(output_path, "inletDefinition-VOFw.csv"),
-             os.path.join(output_path, "inletDefinition-Ux.csv"),
-             os.path.join(output_path, "inletDefinition-Uy.csv"),
-             os.path.join(output_path, "inletDefinition-Uz.csv"),
-            ]
-    toWrite = [inlet_model.VOFwVal[:, :, 0], inlet_model.UVal[:, :, 0],
-               inlet_model.UVal[:, :, 1], inlet_model.UVal[:, :, 2]]
-    for fi in np.arange(len(files)):
-        f = open(files[fi], 'w')
+    csv_files = [
+        os.path.join(output_path, "inletDefinition-VOFw.csv"),
+        os.path.join(output_path, "inletDefinition-Ux.csv"),
+        os.path.join(output_path, "inletDefinition-Uy.csv"),
+        os.path.join(output_path, "inletDefinition-Uz.csv"),
+    ]
+    toWrite = [
+        inlet_model.alpha[:, :, 0],
+        inlet_model.velocity[:, :, 0],
+        inlet_model.velocity[:, :, 1],
+        inlet_model.velocity[:, :, 2]
+    ]
+    for fi, file_i in enumerate(csv_files):
+        f = open(file_i, 'w')
         f.write('x coord,y coord,z coord,value \n')
-        for i in np.arange(len(coordList[:, 0])):
-            for j in np.arange(len(inlet_model.timeVal)):
-                coordPoint = np.array([coordList[i, 1] - (velocity * inlet_model.timeVal[j]) * normalInlet[0],
-                                    coordList[i, 2] - (velocity * inlet_model.timeVal[j]) * normalInlet[1],
-                                    coordList[i, 3] - (velocity * inlet_model.timeVal[j]) * normalInlet[2]])
-                f.write(str(coordPoint[0]) + ',' + str(coordPoint[1]) + ',' + str(coordPoint[2]) + ',' + str(
-                    toWrite[fi][i, j]) + '\n')
+        for i in np.arange(len(face_list[:, 0])):
+            for j, time_j in enumerate(inlet_model.time):
+                cell_coord = face_list[i, 1:4] - (velocity_bc * time_j) * normal_inlet[:]
+                f.write(str(cell_coord[0]) + ',' + str(cell_coord[1]) + ',' + str(cell_coord[2]) + ',' +
+                        str(toWrite[fi][i, j]) + '\n')
         f.close()
     logger.info("Inlet profile saved to CSV-files.")
-
-    logger.info("========================End inlet_modelling========================")

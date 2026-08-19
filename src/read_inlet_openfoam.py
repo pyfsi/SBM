@@ -1,17 +1,17 @@
-from utils import np, os, sys, linecache, SBM_OUTPUT, logging
+from utils import np, os, sys, linecache, subprocess, logging
+from utils import SBM_OUTPUT
 logger = logging.getLogger(__name__)
 
 TOLERANCE = 0.01
 
 def read_inlet_openfoam(config):
-    logger.info("========================Start read_inlet_openfoam========================")
     print(f"Running read_inlet_openfoam")
 
     # alias for config variables
     case_path = os.getcwd()
     cfd_module = str(config["packages"]["cfd_program"] + "/" + config["packages"]["cfd_version"])
     openfoam_type = str(config.get("openfoam_type"))
-    dimesion = int(config["cfd"]["dimension"])
+    dimension = int(config["cfd"]["dimension"])
     start_time = str(config["cfd"]["start_time"])
     inlet_name = str(config["cfd"]["inlet_name"])
 
@@ -23,9 +23,11 @@ def read_inlet_openfoam(config):
     # Read inlet boundary from OpenFOAM
     logger.info("Starting 'postProcess' module of OpenFOAM")
     if openfoam_type=="com":
-        os.system("cd " + case_path + "; ml " + cfd_module + "; source $FOAM_BASH; postProcess -time " + start_time + ";")
+        command = "ml " + cfd_module + "; source $FOAM_BASH; postProcess -time " + start_time + ";"
+        subprocess.run(command, cwd=case_path, shell=True)
     if openfoam_type=="org":
-        os.system("cd " + case_path + "; ml " + cfd_module + "; source $FOAM_BASH; foamPostProcess; foamPostProcess -func writeCellCentres;")
+        command = "ml " + cfd_module + "; source $FOAM_BASH; foamPostProcess; foamPostProcess -func writeCellCentres;"
+        subprocess.run(command, cwd=case_path, shell=True)
     logger.info("Finished 'postProcess'")
 
     # filenames
@@ -47,13 +49,16 @@ def read_inlet_openfoam(config):
             if not os.path.exists(source_file):
                 sys.exit(f"{source_file} not found")
 
-            os.system("cd " + case_path + "; grep -nr " + inlet_name + " " + source_file + " | cut -d : -f 1 > lineNr")
+            command = "grep -nr " + inlet_name + " " + source_file + " | cut -d : -f 1 > lineNr"
+            subprocess.run(command, cwd=case_path, shell=True)
             lineNameNr = int(open(case_path + "/lineNr", 'r').readline())
             lineStartNr = lineNameNr + 6  # In case of non-uniform list, this is where the list of values in the source_file starts
             rowsNrIndex = lineNameNr + 4  # On this line, the number of cell centers on the inlet is stated
-            os.system("cd " + case_path + "; awk NR==" + str(rowsNrIndex) + " " + source_file + " > rowsNr")
+            command = "awk NR==" + str(rowsNrIndex) + " " + source_file + " > rowsNr"
+            subprocess.run(command, cwd=case_path, shell=True)
             rowsNr = int(open(case_path + "/rowsNr", 'r').readline())
-            os.system("cd " + case_path + "; rm lineNr rowsNr")
+            os.remove(os.path.join(case_path, "lineNr"))
+            os.remove(os.path.join(case_path, "rowsNr"))
             tempCoordFile = np.ones([rowsNr, 1]) * float("inf")
             for j in np.arange(rowsNr):
                 tempCoordFile[j, 0] = float(linecache.getline(source_file, lineStartNr + j))
@@ -61,47 +66,51 @@ def read_inlet_openfoam(config):
         except ValueError:
             # If 'rowsNr' not local variable
             if 'rowsNr' not in locals():
-                checkFile = case_path + "/" + start_time + inlet_geometry_filenames[1]
-                os.system("cd " + case_path + "; grep -nr " + inlet_name + " " + checkFile + " | cut -d : -f 1 > lineNr")
+                center_y_file = case_path + "/" + start_time + inlet_geometry_filenames[1]
+                command = "grep -nr " + inlet_name + " " + center_y_file + " | cut -d : -f 1 > lineNr"
+                subprocess.run(command, cwd=case_path, shell=True)
                 lineNameNr_CF = int(open(case_path+"/lineNr",'r').readline())
                 rowsNrIndex_CF = lineNameNr_CF+4 # On this line, the number of cell centers on the inlet is stated
-                os.system("cd " + case_path + "; awk NR==" + str(rowsNrIndex_CF) + " " + checkFile + " > rowsNr")
+                command = "awk NR==" + str(rowsNrIndex_CF) + " " + center_y_file + " > rowsNr"
+                subprocess.run(command, cwd=case_path, shell=True)
                 rowsNr = int(open(case_path+"/rowsNr", 'r').readline())
-                os.system("cd " + case_path + "; rm lineNr rowsNr")
+                os.remove(os.path.join(case_path, "lineNr"))
+                os.remove(os.path.join(case_path, "rowsNr"))
             indexUV = lineNameNr + 3
-            os.system("cd " + case_path + "; awk NR==" + str(indexUV) + " " + source_file + " > unifValue")
-            unifValue = float(open(case_path+"/unifValue", 'r').readline().split()[-1][0:-1]) # First '-1'm akes sure the value is read, but this still contains a semi-colon, so this should be removed with second index '[0:-1]'.
-            os.system("cd " + case_path + "; rm unifValue")
+            command = "awk NR==" + str(indexUV) + " " + source_file + " > unifValue"
+            subprocess.run(command, cwd=case_path, shell=True)
+            unifValue = float(open(case_path+"/unifValue", 'r').readline().split()[-1][0:-1])
+            os.remove(os.path.join(case_path, "unifValue"))
             tempCoordFile = np.ones([rowsNr, 1])*float("inf")
             for j in np.arange(rowsNr):
                 tempCoordFile[j, 0] = unifValue
 
         if i == 0:
-            coord_list = np.ones([rowsNr, 5]) * float("inf")  # ID - X - Y - Z - Area
-            coord_list[:, 0] = np.arange(rowsNr)
+            face_list = np.ones([rowsNr, 5]) * float("inf")  # ID - X - Y - Z - Area
+            face_list[:, 0] = np.arange(rowsNr)
 
-        coord_list[:, (i + 1)] = tempCoordFile[:, 0]
+        face_list[:, (i + 1)] = tempCoordFile[:, 0]
 
 
     # Check that all values are inserted correctly
     for i in np.arange(rowsNr):
         for j in np.arange(5):
-            if coord_list[i, j] > 1e15:
+            if face_list[i, j] > 1e15:
                 sys.exit("Not all values are correctly read into the Python-script 'TubeBundle_ReadInlet'")
     logger.info("Completed loading of cell coordinates and face areas into Python.")
 
     # Calculate inlet normal
     logger.info("Calculating inlet normals.")
-    if dimesion == 3:
-        point1 = coord_list[0, 1:4]
-        point2 = coord_list[1, 1:4]
+    if dimension == 3:
+        point1 = face_list[0, 1:4]
+        point2 = face_list[1, 1:4]
         i = 2
-        point3 = coord_list[i, 1:4]
+        point3 = face_list[i, 1:4]
         enum = np.linalg.norm(np.cross(point2 - point1, point3 - point1))
         denom = (np.linalg.norm(point2 - point1) * np.linalg.norm(point3 - point1))
         while (enum / denom) < TOLERANCE:
             i = i + 1
-            point3 = coord_list[i, 1:4]
+            point3 = face_list[i, 1:4]
             enum = np.linalg.norm(np.cross(point2 - point1, point3 - point1))
             denom = (np.linalg.norm(point2 - point1) * np.linalg.norm(point3 - point1))
 
@@ -109,10 +118,11 @@ def read_inlet_openfoam(config):
         normal_inlet = normal_vec / np.linalg.norm(normal_vec)
 
         # Need one more point from the domain to determine the correct orientation of the inlet normal
-        os.system("cd " + case_path + "; grep -nr '(' constant/polyMesh/points | head -n 1 | cut -d : -f 1 > lineNr")
+        command = "grep -nr '(' constant/polyMesh/points | head -n 1 | cut -d : -f 1 > lineNr"
+        subprocess.run(command, cwd=case_path, shell=True)
         lineNameNr = int(open(case_path+"/lineNr", 'r').readline())
         lineNr = lineNameNr+1  # First point that is defined
-        os.system("cd " + case_path + "; rm lineNr ")
+        os.remove(os.path.join(case_path, "lineNr"))
         i = 0
         points_path = os.path.join(case_path, "constant", "polyMesh", "points")
         with open(points_path, 'r') as f:
@@ -128,7 +138,7 @@ def read_inlet_openfoam(config):
             # switch sign if normal_inlet pointing outside
             if np.dot(point_inside_domain-point1, normal_inlet) < 0:
                 normal_inlet = (-1.0)*normal_inlet
-    elif dimesion == 2:
+    elif dimension == 2:
         normal_inlet = np.zeros([3])
         print("The normal to the inlet cannot be calculated directly. Please input the x-, y- and z-coordinates of the normal vector.")
         axis = ["x", "y", "z"]
@@ -144,12 +154,10 @@ def read_inlet_openfoam(config):
             normal_inlet[i] = temp_normal
         normal_inlet = (1/np.linalg.norm(normal_inlet))*normal_inlet
     else:
-        sys.exit("Number of dimesion should be either 2 or 3.")
+        sys.exit("Number of dimension should be either 2 or 3.")
 
     logger.info(f"Completed calculating normal to the inlet, pointing into the domain: {normal_inlet}")
 
     # Save inlet and normal in Python Numpy-array format
-    np.save(os.path.join(output_path, "inletPython.npy"), coord_list)
+    np.save(os.path.join(output_path, "inletPython.npy"), face_list)
     np.save(os.path.join(output_path, "normalInletPython.npy"), normal_inlet)
-
-    logger.info("========================End read_inlet_openfoam========================")
