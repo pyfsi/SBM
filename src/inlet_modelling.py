@@ -190,15 +190,8 @@ def inlet_modelling(config):
     logging.info(seed_msg)
     random.seed(seed)
 
-    if int((t_end-t_start)/block_size) != ((t_end-t_start)/block_size):
-        raise RuntimeError("The desired insertion interval (t_end - t_start) should be a multiple of t_unit.")
-    if t_end <= t_start:
-        raise RuntimeError("t_end should be larger than t_start.")
-    if (abs(int(block_size/timestep_size) - block_size/timestep_size) >= timestep_size) and (abs((int(block_size/timestep_size)+1) - block_size/timestep_size) >= timestep_size):
-        raise RuntimeError("Variable block_size should be a multiple of time_step.")
-
     # Reading the inlet geometry and normal to the inlet condition
-    face_list = np.load(os.path.join(output_path, "inletPython.npy"))
+    face_list = np.load(os.patlh.join(output_path, "inletPython.npy"))
     normal_inlet = np.load(os.path.join(output_path, "normalInletPython.npy"))
 
     # Initialize inlet model class

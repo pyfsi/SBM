@@ -90,6 +90,18 @@ if __name__=='__main__':
         config = yaml.load(conf_f, Loader=yaml.SafeLoader)
     profile_run = config.get("profile_run", False)
 
+    # config correctness check
+    t_start = float(config["cfd"]["start_time"])
+    t_end = float(config["cfd"]["end_time"])
+    timestep_size = float(config["cfd"]["delta_time"])
+    block_size = float(config["sbm"]["t_unit"])
+    if t_end <= t_start:
+            raise RuntimeError("t_end should be larger than t_start.")
+    if (t_end-t_start) % block_size != 0.0:
+        raise RuntimeError("Insertion interval (t_end - t_start) should be a multiple of t_unit.")
+    if block_size % timestep_size != 0.0:
+        raise RuntimeError("Variable t_unit should be a multiple of time_step.")
+
     if profile_run:
         prof_name = "sbm.prof"
         prof_path = os.path.join(os.getcwd(), SBM_OUTPUT, prof_name)
