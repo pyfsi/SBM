@@ -24,17 +24,14 @@ class InletModel():
         self.face_list = face_list # ID - X - Y - Z - Area
         self.normal_inlet = normal_inlet
 
-        # store previous bubble centers for next time step
-        self.prev_centers = []
-
         # Initializing velocity and phase fraction arrays
-        n_time_step = int((self.t_end - self.t_start)/self.timestep_size)+1
+        self.time = np.arange(self.t_start, self.t_end+self.timestep_size, self.timestep_size)
+        n_time_step = len(self.time)
         self.velocity = np.ones([len(face_list), n_time_step, 3])
         self.velocity[:, :, 0] = self.velocity_bc * normal_inlet[0]
         self.velocity[:, :, 1] = self.velocity_bc * normal_inlet[1]
         self.velocity[:, :, 2] = self.velocity_bc * normal_inlet[2]
         self.alpha = np.ones([len(face_list), n_time_step, 1])
-        self.time = np.linspace(self.t_start, self.t_end+self.timestep_size, n_time_step)
 
     def update(self, velocity, alpha):
         self.velocity = velocity
@@ -105,7 +102,8 @@ class InletModel():
             cell_area = face_list[i, 4]
             for j in range(min_time_idx_in_bubble, max_time_idx_in_bubble):
                 cell_coord = face_list[i, 1:4] - (velocity_bc * time[j]) * normal_inlet[:]
-                if np.linalg.norm(cell_coord-bubble_center) < radius_gas:
+                distance_sqr = np.dot(cell_coord-bubble_center, cell_coord-bubble_center)
+                if distance_sqr < radius_gas * radius_gas:
                     if self.alpha[i, j, 0] == 1.0:
                         alpha_temp[i, j, 0] = 0.0
                         velocity_temp[i, j, :] = velocity_bc * normal_inlet[:]
@@ -141,14 +139,13 @@ class InletModel():
         timesteps_per_block = int(block_size / timestep_size)
         min_time_at_blockidx = block_idx * timesteps_per_block
         max_time_at_blockidx = (block_idx + 1) * timesteps_per_block - 1
-        n_inlet_faces = len(face_list) - 1
 
         iter = 0
         mg_inserted = 0.0
         # iterate until mass of inserted gas within tolerance of target mass
         while abs(mg_per_block-mg_inserted) > (tol_mg):
             # calculate bounds for bubble sampling
-            face_idx_bounds = [0, n_inlet_faces]
+            face_idx_bounds = [0, len(face_list) - 1]
             time_idx_bounds = [min_time_at_blockidx, max_time_at_blockidx]
             bubble_mass_bounds = [
                 min((mg_min, mg_per_block - mg_inserted)),
@@ -158,13 +155,12 @@ class InletModel():
             face_idx, time_idx, bubble_mass = self.sample_bubble_coord(face_idx_bounds, time_idx_bounds, bubble_mass_bounds)
             is_bubble_defined, mg_defined = self.define_bubble(face_idx, time_idx, block_idx, bubble_mass)
 
-            # print for debugging
-            # residual = mg_per_block-mg_inserted
-            # print(f"\t bubble_mass {bubble_mass:.3e} \t Residual {residual:.3e}")
-
             if is_bubble_defined:
                 mg_inserted += mg_defined
                 iter = 0
+
+                # print for debugging
+                logger.info(f"\t\t inserted at face_idx={face_idx}, time_idx={time_idx}, m_b={bubble_mass}")
             else:
                 iter = iter+1
 
@@ -194,15 +190,8 @@ def inlet_modelling(config):
     logging.info(seed_msg)
     random.seed(seed)
 
-    if int((t_end-t_start)/block_size) != ((t_end-t_start)/block_size):
-        raise RuntimeError("The desired time interval (t_end - t_start) should be a multiple of t_unit.")
-    if t_end <= t_start:
-        raise RuntimeError("The t_end should be larger than the t_start.")
-    if (abs(int(block_size/timestep_size) - block_size/timestep_size) >= timestep_size) and (abs((int(block_size/timestep_size)+1) - block_size/timestep_size) >= timestep_size):
-        raise RuntimeError("Variable block_size should be a multiple of time_step.")
-
     # Reading the inlet geometry and normal to the inlet condition
-    face_list = np.load(os.path.join(output_path, "inletPython.npy"))
+    face_list = np.load(os.patlh.join(output_path, "inletPython.npy"))
     normal_inlet = np.load(os.path.join(output_path, "normalInletPython.npy"))
 
     # Initialize inlet model class
@@ -211,9 +200,9 @@ def inlet_modelling(config):
     # The random generator selects:
     # - the center point of a bubble, both in inlet plane and in time
     # - the bubble mass
-    n_blocks = int((t_end-t_start)/block_size) + 1
+    n_blocks = int((t_end-t_start)/block_size)
     logger.info(f"Between t_start {t_start} s and t_end {t_end} s, {n_blocks} intervals of {block_size} s need to be defined.")
-    for block_idx in range(n_blocks - 1): # no insertion at last time step
+    for block_idx in range(n_blocks): # no insertion at last time step
         start_msg = f"Start bubble calculation for time interval {block_idx}"
         logger.info(start_msg)
         print(start_msg)
@@ -221,34 +210,31 @@ def inlet_modelling(config):
         logger.info(f"\t Mass of inserted gas: {mg_inserted} kg. (Target mass: {mg_per_block} kg).")
     logger.info(f"Inlet model iteration loop ended.")
 
-    # Writing the profile to be used in OpenFOAM
+    # Write alpha and velocity profiles
     logger.info("Saving inlet profile to Python (numpy) npy-files.")
     np.save(os.path.join(output_path, "inletDefinition-U.npy"), inlet_model.velocity)
     np.save(os.path.join(output_path, "inletDefinition-VOFw.npy"), inlet_model.alpha)
     np.save(os.path.join(output_path, "inletDefinition-time.npy"), inlet_model.time)
     logger.info("Inlet profile saved in Python (numpy) npy-files.")
 
-    # Check: convert to file compatible with ParaView to visualize the pre-inlet domain.
+    # print csv to visualize pre-inlet domain
     logger.info("Saving inlet profile to CSV-files. ")
-    csv_files = [
-        os.path.join(output_path, "inletDefinition-VOFw.csv"),
-        os.path.join(output_path, "inletDefinition-Ux.csv"),
-        os.path.join(output_path, "inletDefinition-Uy.csv"),
-        os.path.join(output_path, "inletDefinition-Uz.csv"),
-    ]
-    toWrite = [
-        inlet_model.alpha[:, :, 0],
-        inlet_model.velocity[:, :, 0],
-        inlet_model.velocity[:, :, 1],
-        inlet_model.velocity[:, :, 2]
-    ]
-    for fi, file_i in enumerate(csv_files):
-        f = open(file_i, 'w')
-        f.write('x coord,y coord,z coord,value \n')
-        for i in np.arange(len(face_list[:, 0])):
-            for j, time_j in enumerate(inlet_model.time):
-                cell_coord = face_list[i, 1:4] - (velocity_bc * time_j) * normal_inlet[:]
-                f.write(str(cell_coord[0]) + ',' + str(cell_coord[1]) + ',' + str(cell_coord[2]) + ',' +
-                        str(toWrite[fi][i, j]) + '\n')
-        f.close()
+    csv_file_path = os.path.join(output_path, "inletModelData.csv")
+    inlet_all_variable = np.concatenate((inlet_model.alpha[:,:,:], inlet_model.velocity[:,:,:]), axis=2)
+    csv_header = "x_coord,y_coord,z_coord,alpha,velocity_x,velocity_y,velocity_z"
+
+    # get cell coordinates in x,y,z space
+    n_timesteps = len(inlet_model.time)
+    n_faces = len(face_list)
+    face_list_extended = np.array([face_list[:, 1:4]] * n_timesteps)
+    time_velocity_product = np.tensordot(inlet_model.time[:], velocity_bc*normal_inlet[:], axes=0)
+    cell_coords = face_list_extended[:, :, :] - time_velocity_product[:, None, : ]
+    cell_coords = np.swapaxes(cell_coords, 0, 1)
+    cell_coords = np.reshape(cell_coords, (n_timesteps*n_faces, -1), order='C')
+
+    # save csv
+    inlet_var_reshaped = np.reshape(inlet_all_variable, (n_timesteps*n_faces, -1), order="C")
+    inlet_ds = np.concatenate((cell_coords, inlet_var_reshaped), axis=1)
+    np.savetxt(csv_file_path, inlet_ds, fmt='%.6e',
+               header=csv_header, delimiter=",", comments='')
     logger.info("Inlet profile saved to CSV-files.")
