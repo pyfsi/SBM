@@ -60,7 +60,7 @@ def plot_probe_data(probe_loc, probe_data, var_name,
                     probe_idx=None, scale=1000, psd_xrange=[None, None], psd_window=None,
                     ):
     fig, (ax0, ax1) = plt.subplots(2, 1, layout="constrained")
-    fig.tight_layout(h_pad=4, rect=[0.02, 0.05, 0.83, 0.98])
+    fig.tight_layout(h_pad=4, rect=[0.03, 0.05, 0.83, 0.98])
 
     # time variables
     time = probe_data[var_name]["time"]
