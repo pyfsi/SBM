@@ -1,5 +1,5 @@
 purge_boundary_data: True     # Purges old boundary data directory
-profile_run:         False    # Profile code execution
+profile_run:         True    # Profile code execution
 packages:
   cfd_program:  OpenFOAM
   cfd_version:  v2312-foss-2023a
