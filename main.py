@@ -5,7 +5,7 @@
 # The values for the boundary condition are then written by running the third script ("write_bc_<solver>.py")
 
 from utils import os, yaml, shutil, logging
-from utils import get_openfoam_type, memory_profile
+from utils import get_openfoam_type, memory_profile, modulo
 from utils import SBM_OUTPUT
 import cProfile
 
@@ -96,10 +96,11 @@ if __name__=='__main__':
     timestep_size = float(config["cfd"]["delta_time"])
     block_size = float(config["sbm"]["t_unit"])
     if t_end <= t_start:
-            raise RuntimeError("t_end should be larger than t_start.")
-    if (t_end-t_start) % block_size != 0.0:
+        raise RuntimeError("t_end should be larger than t_start.")
+    if modulo((t_end-t_start), block_size) > 1e-12:
         raise RuntimeError("Insertion interval (t_end - t_start) should be a multiple of t_unit.")
-    if block_size % timestep_size != 0.0:
+    if modulo(block_size, timestep_size) > 1e-12:
+        print(abs(block_size % timestep_size))
         raise RuntimeError("Variable t_unit should be a multiple of time_step.")
 
     if profile_run:

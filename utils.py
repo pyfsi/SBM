@@ -58,6 +58,12 @@ def truncate(val: float, stepsize: float) -> float:
     digit = 1.0/stepsize
     return round(val*digit) / digit
 
+def modulo(a: float, b: float) -> float:
+    '''
+    Calculate the remainder from dividing a with b.
+    '''
+    return a - int(a/b) * b
+
 def get_openfoam_type(cfd_version: str) -> str:
     """
     Obtain the OpenFOAM type by checking the cfd_version string according to predefined regex patterns.
