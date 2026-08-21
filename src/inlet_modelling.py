@@ -41,7 +41,7 @@ class InletModel():
         # sample cell index for spatial coordinates
         face_idx = random.randint(face_idx_bounds[0], face_idx_bounds[1])
 
-        # sample cell index for temporal coordinates
+        # sample time index for temporal coordinates
         time_idx = random.randint(time_idx_bounds[0], time_idx_bounds[1])
 
         # sample bubble mass
@@ -191,7 +191,7 @@ def inlet_modelling(config):
     random.seed(seed)
 
     # Reading the inlet geometry and normal to the inlet condition
-    face_list = np.load(os.patlh.join(output_path, "inletPython.npy"))
+    face_list = np.load(os.path.join(output_path, "inletPython.npy"))
     normal_inlet = np.load(os.path.join(output_path, "normalInletPython.npy"))
 
     # Initialize inlet model class
