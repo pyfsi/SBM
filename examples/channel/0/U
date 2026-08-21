@@ -31,7 +31,7 @@ boundaryField
 	    type	timeVaryingMappedFixedValue;
 	    setAverage	false;
 	    offset	(0 0 0);
-	    mapMethod	nearest; //planar or nearest
+	    mapMethod	nearest;
     }
 
     wall
@@ -39,12 +39,6 @@ boundaryField
         // movingWallVelocity reduces to fixedValue if the mesh is not moving
         type        movingWallVelocity;
         value       uniform (0 0 0);
-    }
-
-    defaultFaces
-    {
-        type        slip;
-        value       $internalField;
     }
 
 }

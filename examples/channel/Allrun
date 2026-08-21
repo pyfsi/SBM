@@ -51,14 +51,6 @@ else
     echo "cAlpha 1;" > system/cAlpha
 fi
 
-# Update patch name and type
-#runCommand createPatch -overwrite
-
-# Set cell zones contained inside the .stl surfaces
-#runCommand topoSet -dict system/topoSetZonesDict
-
-# Set internal fields according to setFieldsDict
-#runCommand setFields
 
 PNAME=p_rgh
 
@@ -72,7 +64,7 @@ fi
 NPROC=$(foamDictionary -entry "numberOfSubdomains" -value system/decomposeParDict)
 
 # Mesh renumbering
-runParallel $NPROC renumberMesh -overwrite
+#runParallel $NPROC renumberMesh -overwrite
 
 # Initialise flow
 runParallel $NPROC potentialFoam -initialiseUBCs -pName $PNAME

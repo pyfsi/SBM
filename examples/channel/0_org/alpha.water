@@ -10,45 +10,41 @@ FoamFile
     version     2.0;
     format      ascii;
     arch        "LSB;label=32;scalar=64";
-    class       dictionary;
-    location    "constant/polyMesh";
-    object      meshMetaDict;
+    class       volScalarField;
+    location    "0";
+    object      alpha.water;
 }
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
-surfaceFile     "Box_Geometry.fms";
+dimensions      [0 0 0 0 0 0 0];
 
-surfaceMeta
+internalField   uniform 1;
+
+
+boundaryField
 {
-    nPoints         8;
-    nFacets         12;
-    nPatches        3;
-    nFeatureEdges   12;
-    patches
+    outlet
     {
-        patch_1_0
-        {
-            type            empty;
-            nFacets         2;
-        }
-        patch_2_0
-        {
-            type            empty;
-            nFacets         2;
-        }
-        patch_3_0
-        {
-            type            empty;
-            nFacets         8;
-        }
+        type            inletOutlet;
+        inletValue      uniform 0;
+        value           uniform 0;
     }
-    pointSubsets
+    inlet
     {
+        type            timeVaryingMappedFixedValue;
+        fieldTable      alpha.water
+        offset          constant 0;
+        value           uniform 1;
+	mapMethod	nearest;
     }
-    facetSubsets
+    wall
     {
-    }
-    featureEdgeSubsets
-    {
+        type            constantAlphaContactAngle;
+        theta0          25;
+        limit           gradient;
+        value           uniform 0;
     }
 }
+
+
+// ************************************************************************* //
