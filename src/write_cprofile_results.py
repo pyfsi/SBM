@@ -27,10 +27,10 @@ def print_sbm_callers(prof_path, stats_path):
         ps.sort_stats('cumulative')
         ps.print_callers()
 
-if __name__ == "__main__":
+def write_cprofile_sbm():
     # paths
     cwd = os.getcwd()
-    stats_sbm_path = os.path.join(cwd, "sbm_files", "stats_sbm")
+    stats_sbm_path = os.path.join(cwd, "sbm_files", "cprofile_sbm")
     prof_path = os.path.join(cwd, "sbm_files", "sbm.prof")
 
     if (os.path.exists(stats_sbm_path)):

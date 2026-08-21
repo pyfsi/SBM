@@ -100,13 +100,15 @@ if __name__=='__main__':
     if modulo((t_end-t_start), block_size) > 1e-12:
         raise RuntimeError("Insertion interval (t_end - t_start) should be a multiple of t_unit.")
     if modulo(block_size, timestep_size) > 1e-12:
-        print(abs(block_size % timestep_size))
         raise RuntimeError("Variable t_unit should be a multiple of time_step.")
 
     if profile_run:
         prof_name = "sbm.prof"
         prof_path = os.path.join(os.getcwd(), SBM_OUTPUT, prof_name)
         cProfile.run("main(config)", prof_path)
+
+        from src.write_cprofile_results import write_cprofile_sbm
+        write_cprofile_sbm()
     else:
         main(config)
 
