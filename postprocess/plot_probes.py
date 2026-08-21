@@ -6,11 +6,11 @@ probe_loc_pattern = r"# Probe.*"
 delimiter = r'[\s\n]+'
 
 ## USER INPUT
-NFFT = 1 << 12          # points for Welch algorithm
+NFFT = 1 << 11          # points for Welch algorithm
 F_SAMPLING = None        # sampling frequency for Welch algorithm
 PSD_XRANGE = [0, 500]   # PSD plot x-axis range in Hz
 PSD_WINDOW = [0.0, 0.05] # window for PSD function. Ignore all data points outside this range.
-PROBE_IDX = [0, 1, 2]   # probe indices
+PROBE_IDX = None  # probe indices
 
 VARIABLE_MAP = {
     "p": "Pressure [Pa]",
@@ -59,7 +59,8 @@ def read_probe_data(probe_loc, probes_path):
 def plot_probe_data(probe_loc, probe_data, var_name,
                     probe_idx=None, scale=1000, psd_xrange=[None, None], psd_window=None,
                     ):
-    fig, (ax0, ax1) = plt.subplots(2, 1, layout='constrained')
+    fig, (ax0, ax1) = plt.subplots(2, 1, layout="constrained")
+    fig.tight_layout(h_pad=4, rect=[0.02, 0.05, 0.83, 0.98])
 
     # time variables
     time = probe_data[var_name]["time"]
@@ -89,7 +90,7 @@ def plot_probe_data(probe_loc, probe_data, var_name,
             x = time
             y = var
 
-        # convvert to numpy
+        # convert to numpy
         x = x.to_numpy()
         y = y.to_numpy()
 
@@ -98,8 +99,7 @@ def plot_probe_data(probe_loc, probe_data, var_name,
         ax0.set_ylabel(VARIABLE_MAP[var_name])
         ax0.set_xlabel("Time [s]")
         ax0.grid(True)
-        # ax0.legend(loc='center left', bbox_to_anchor=(1.0, 0.5))
-        # ax0.legend(ncol=4, bbox_to_anchor=(0.5,-0.5), loc='lower center', edgecolor='w')
+        ax0.ticklabel_format(axis='y', style='sci', scilimits=(0,5))
 
         # PSD
         freq, pxx = sps.welch(y, fs=fs, nfft=NFFT,)
@@ -107,7 +107,17 @@ def plot_probe_data(probe_loc, probe_data, var_name,
         ax1.set_ylabel("PSD [m*m/Hz]")
         ax1.set_xlabel("Frequency [Hz]")
         ax1.set_xlim(psd_xrange[0], psd_xrange[1])
-        ax1.grid()
+        ax1.grid(True)
+        ax1.ticklabel_format(axis='y', style='sci', scilimits=(0,5))
+
+        # legend
+        fig.legend(ncol=1,
+                   bbox_to_anchor=(1.0, 1.0),
+                   loc='upper right',
+                   edgecolor='k',
+                   title="Probe locations in mm",
+                   fontsize='small',
+                   fancybox=True)
 
 if __name__=="__main__":
     # get paths
