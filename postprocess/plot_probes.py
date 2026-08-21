@@ -94,8 +94,6 @@ def plot_probe_data(probe_loc, probe_data, var_name,
         y = y.to_numpy()
 
         marker = "o"
-        # if len(var)>100:
-        #     marker = None
         ax0.plot(x, y, label=label, marker=marker)
         ax0.set_ylabel(VARIABLE_MAP[var_name])
         ax0.set_xlabel("Time [s]")

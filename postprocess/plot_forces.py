@@ -6,9 +6,10 @@ cofr_pattern = r"# CofR.*"
 delimiter = r'[\s\n]+'
 
 ## USER INPUT
+NFFT = 1 << 11 # number of interpolation points for FFT
+F_SAMPLING = None        # sampling frequency for Welch algorithm
 PSD_XRANGE = [0, 500] # in Hz
 PSD_WINDOW = [0.00, 0.2] # in s
-NFFT = 2**11 # number of interpolation points for FFT
 VARIABLE_MAP = {
     "force": "Force [N]",
     "moment": "Moment [Nm]",
@@ -126,6 +127,8 @@ def plot_data(data: dict, var_name: str, key_type=None, marker=None,
 
         # PSD
         fs = 1/dt
+        if F_SAMPLING:
+            fs = F_SAMPLING
         freq, pxx = sps.welch(y, fs=fs, nfft=NFFT,)
         ax1.plot(freq, pxx, marker="o")
         ax1.set_ylabel("PSD [m*m/Hz]")
