@@ -27,15 +27,11 @@ class InletModel():
         # Initializing velocity and phase fraction arrays
         self.time = np.arange(self.t_start, self.t_end+self.timestep_size, self.timestep_size)
         n_time_step = len(self.time)
-        self.velocity = np.ones([len(face_list), n_time_step, 3])
+        self.velocity = np.ones([len(face_list), n_time_step, 3], dtype=np.float64)
         self.velocity[:, :, 0] = self.velocity_bc * normal_inlet[0]
         self.velocity[:, :, 1] = self.velocity_bc * normal_inlet[1]
         self.velocity[:, :, 2] = self.velocity_bc * normal_inlet[2]
-        self.alpha = np.ones([len(face_list), n_time_step, 1])
-
-    def update(self, velocity, alpha):
-        self.velocity = velocity
-        self.alpha = alpha
+        self.alpha = np.ones([len(face_list), n_time_step, 1], dtype=np.float64)
 
     def sample_bubble_coord(self, face_idx_bounds, time_idx_bounds, bubble_mass_bounds):
         # sample cell index for spatial coordinates
@@ -50,7 +46,7 @@ class InletModel():
         return face_idx, time_idx, bubble_mass
 
     def define_bubble(self, face_idx, time_idx, block_idx, bubble_mass):
-
+        # alias
         t_start = self.t_start
         t_end = self.t_end
         timestep_size = self.timestep_size
@@ -63,13 +59,9 @@ class InletModel():
         normal_inlet = self.normal_inlet
         time = self.time
 
-        # temporary storage arrays (must be np.array)
-        velocity_temp = np.array(self.velocity)
-        alpha_temp = np.array(self.alpha)
-
-        bubble_coord = face_list[face_idx, :]
+        bubble_coord = face_list[face_idx, :] # ID - X - Y - Z - area
         bubble_time = time[time_idx]
-        bubble_center = bubble_coord[1:4] - (velocity_bc * bubble_time) * normal_inlet[:]
+        bubble_center = bubble_coord[1:4] - (velocity_bc * bubble_time) * normal_inlet[:] # X - Y - Z
 
         # calculate gas radius assuming spherical bubble
         radius_gas = ((3.0*bubble_mass)/(4.0*PI*density_gas))**(1.0/3.0)
@@ -83,46 +75,51 @@ class InletModel():
         if intersect_with_end:
             return False, 0.0
 
-        mg_defined = 0.0
-        mg_bubble_wall = 0.0
-
         # get space and time index (i and j) of bounding box
-        is_inside_bubble = np.linalg.norm(face_list[:, 1:4] - bubble_coord[1:4], axis=1) < radius_gas
-        face_idx_in_bubble = is_inside_bubble.nonzero()[0]
-        min_rel_time_idx_in_bubble = int((rel_cell_time - radius_gas/velocity_bc)/timestep_size)
+        is_inside_radius = np.linalg.norm(face_list[:, 1:4] - bubble_coord[1:4], axis=1) < radius_gas
+        face_idx_in_radius = is_inside_radius.nonzero()[0]
+        min_rel_time_idx_in_radius = int((rel_cell_time - radius_gas/velocity_bc)/timestep_size)
         temp = (rel_cell_time + radius_gas/velocity_bc) // timestep_size
-        max_rel_time_idx_in_bubble = int(temp) + 1
+        max_rel_time_idx_in_radius = int(temp) + 1
 
         # convert from relative time idx
-        min_time_idx_in_bubble = block_idx * int(block_size / timestep_size) + min_rel_time_idx_in_bubble
-        max_time_idx_in_bubble = block_idx * int(block_size / timestep_size) + max_rel_time_idx_in_bubble
+        min_time_idx_in_radius = block_idx * int(block_size / timestep_size) + min_rel_time_idx_in_radius
+        max_time_idx_in_radius = block_idx * int(block_size / timestep_size) + max_rel_time_idx_in_radius
+        time_idx_in_radius = np.arange(min_time_idx_in_radius, max_time_idx_in_radius)
 
-        n_true_flag = 0
-        for i in face_idx_in_bubble:
-            cell_area = face_list[i, 4]
-            for j in range(min_time_idx_in_bubble, max_time_idx_in_bubble):
-                cell_coord = face_list[i, 1:4] - (velocity_bc * time[j]) * normal_inlet[:]
-                distance_sqr = np.dot(cell_coord-bubble_center, cell_coord-bubble_center)
-                if distance_sqr < radius_gas * radius_gas:
-                    if self.alpha[i, j, 0] == 1.0:
-                        alpha_temp[i, j, 0] = 0.0
-                        velocity_temp[i, j, :] = velocity_bc * normal_inlet[:]
+        # create 3d tensor to describe the relative cell positions w.r.t. velocity times time
+        face_list_extended = np.array([face_list[face_idx_in_radius, 1:4]] * len(time_idx_in_radius))
+        time_velocity_product = np.tensordot(time[time_idx_in_radius], velocity_bc*normal_inlet[:], axes=0)
+        cell_coords = face_list_extended[:,:,:] - time_velocity_product[:,None,:]
+        cell_coords = np.swapaxes(cell_coords, 0, 1) # [faces, timesteps, xyz]
 
-                        mg_defined += cell_area * velocity_bc * timestep_size * density_gas
-                        mg_bubble_wall += cell_area * velocity_bc * timestep_size * density_gas
+        # get boolean field if cell is inside bubble
+        displacement = cell_coords[:,:,:]-bubble_center[None,None,:]
+        distance_sqr = np.sum(displacement*displacement, axis=2)
+        is_cell_inside_bubble = distance_sqr < radius_gas * radius_gas
+        face_idx_in_bubble = face_idx_in_radius[is_cell_inside_bubble.nonzero()[0]]
+        time_idx_in_bubble = time_idx_in_radius[is_cell_inside_bubble.nonzero()[1]]
 
-                        n_true_flag += 1
-                    elif intersect_bubble:
-                        mg_bubble_wall += cell_area * velocity_bc * timestep_size * density_gas
-                    else:
-                        return False, 0.0
-
-        if not(intersect_boundary):
-            if mg_bubble_wall < (bubble_mass-np.average(face_list[:, 4])*velocity_bc*timestep_size):
+        # return False if alpha inside to-be-defined bubble is already zero
+        alpha_inside_bubble = self.alpha[face_idx_in_bubble, time_idx_in_bubble, 0]
+        if not intersect_bubble:
+            if np.any(alpha_inside_bubble==0.0):
                 return False, 0.0
 
-        # Save temporary data to class variable data
-        self.update(velocity_temp, alpha_temp)
+        # calculate defined bubble mass
+        avg_gas_mass_per_cell = np.average(face_list[:, 4]) * velocity_bc * timestep_size * density_gas
+        cell_area_inside_bubble = np.sum(face_list[face_idx_in_bubble, 4])
+        bubble_mass_defined = cell_area_inside_bubble * velocity_bc * timestep_size * density_gas
+
+        # return False if defined bubble mass is smaller than expected
+        if not intersect_boundary:
+            if (bubble_mass-bubble_mass_defined) > avg_gas_mass_per_cell:
+                return False, 0.0
+
+        # set alpha and velocity fields and defined gas mass
+        self.alpha[face_idx_in_bubble, time_idx_in_bubble, 0] = 0.0
+        self.velocity[face_idx_in_bubble, time_idx_in_bubble, :] = velocity_bc * normal_inlet[:]
+        mg_defined = cell_area_inside_bubble * density_gas * velocity_bc * timestep_size
 
         return True, mg_defined
 
@@ -190,14 +187,14 @@ def inlet_modelling(config):
     logging.info(seed_msg)
     random.seed(seed)
 
-    # Reading the inlet geometry and normal to the inlet condition
+    # reading inlet geometry and normal to the inlet condition
     face_list = np.load(os.path.join(output_path, "inletPython.npy"))
     normal_inlet = np.load(os.path.join(output_path, "normalInletPython.npy"))
 
-    # Initialize inlet model class
+    # initialize inlet model class
     inlet_model = InletModel(config, face_list, normal_inlet)
 
-    # The random generator selects:
+    # the random generator selects:
     # - the center point of a bubble, both in inlet plane and in time
     # - the bubble mass
     n_blocks = int((t_end-t_start)/block_size)
