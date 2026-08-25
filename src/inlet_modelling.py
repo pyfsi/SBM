@@ -33,6 +33,17 @@ class InletModel():
         self.velocity[:, :, 2] = self.velocity_bc * normal_inlet[2]
         self.alpha = np.ones([len(face_list), n_time_step, 1], dtype=np.float64)
 
+    def _convert_relative_time_idx(self, block_idx: int, val: int) -> int:
+        '''
+        Convert time index relative to time blocks to absolute time index.
+        Args:
+            val: relative time index
+
+        Returns:
+            Returns the absolute time index
+        '''
+        return block_idx * int(self.block_size / self.timestep_size) + val
+
     def sample_bubble_coord(self, face_idx_bounds, time_idx_bounds, bubble_mass_bounds):
         # sample cell index for spatial coordinates
         face_idx = random.randint(face_idx_bounds[0], face_idx_bounds[1])
@@ -78,13 +89,13 @@ class InletModel():
         # get space and time index (i and j) of bounding box
         is_inside_radius = np.linalg.norm(face_list[:, 1:4] - bubble_coord[1:4], axis=1) < radius_gas
         face_idx_in_radius = is_inside_radius.nonzero()[0]
-        min_rel_time_idx_in_radius = int((rel_cell_time - radius_gas/velocity_bc)/timestep_size)
+        min_rel_time_idx_in_radius = int((rel_cell_time - radius_gas/velocity_bc) / timestep_size)
         temp = (rel_cell_time + radius_gas/velocity_bc) // timestep_size
         max_rel_time_idx_in_radius = int(temp) + 1
 
         # convert from relative time idx
-        min_time_idx_in_radius = block_idx * int(block_size / timestep_size) + min_rel_time_idx_in_radius
-        max_time_idx_in_radius = block_idx * int(block_size / timestep_size) + max_rel_time_idx_in_radius
+        min_time_idx_in_radius = self._convert_relative_time_idx(block_idx, min_rel_time_idx_in_radius)
+        max_time_idx_in_radius = self._convert_relative_time_idx(block_idx, max_rel_time_idx_in_radius)
         time_idx_in_radius = np.arange(min_time_idx_in_radius, max_time_idx_in_radius)
 
         # create 3d tensor to describe the relative cell positions w.r.t. velocity times time
@@ -133,13 +144,14 @@ class InletModel():
         mg_min = self.mg_min
         mg_max = self.mg_max
 
+        # calc time indices
         timesteps_per_block = int(block_size / timestep_size)
-        min_time_at_blockidx = block_idx * timesteps_per_block
-        max_time_at_blockidx = (block_idx + 1) * timesteps_per_block - 1
+        min_time_at_blockidx = self._convert_relative_time_idx(block_idx, 0)
+        max_time_at_blockidx = self._convert_relative_time_idx(block_idx, timesteps_per_block - 1)
 
         iter = 0
         mg_inserted = 0.0
-        # iterate until mass of inserted gas within tolerance of target mass
+        # iterate until mass of inserted gas is within tolerance of target mass
         while abs(mg_per_block-mg_inserted) > (tol_mg):
             # calculate bounds for bubble sampling
             face_idx_bounds = [0, len(face_list) - 1]
