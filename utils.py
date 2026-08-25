@@ -61,8 +61,49 @@ def truncate(val: float, stepsize: float) -> float:
 def modulo(a: float, b: float) -> float:
     '''
     Calculate the remainder from dividing a with b.
+    Args:
+        a: dividend
+        b: divisor
+
+    Returns:
+        The remainder
+
+    Raises:
+        ValueError: If one of the arguments can not be converted to float.
     '''
-    return a - int(a/b) * b
+    try:
+        _a_div_b = (a/b)
+    except ZeroDivisionError:
+        raise ZeroDivisionError("Second argument b can not be zero.")
+    except TypeError:
+        raise TypeError("Division can not be applied to given arguments.")
+    except:
+        raise RuntimeError("Something went wrong during division of a with b.")
+
+    return a - int(_a_div_b) * b
+
+def is_inside(val, min, max) -> bool:
+    '''
+    Checks if a value is bounded by min and max.
+    Args:
+        val: value to be checked
+        min: lower bound
+        max: upper bound
+
+    Returns:
+        Returns True if val is larger than min and lower than max
+
+    Raises:
+        ValueError: If one of the arguments can not be converted to float.
+    '''
+    try:
+        _min = float(min)
+        _val = float(val)
+        _max = float(max)
+    except:
+        raise ValueError("One of the given arguments cannot be converted to float.")
+
+    return (_min < _val) & (_val < _max)
 
 def get_openfoam_type(cfd_version: str) -> str:
     """
@@ -92,10 +133,6 @@ def get_openfoam_type(cfd_version: str) -> str:
 
     raise ValueError("The cfd_version variable is unknown for OpenFOAM. \
                      Use the format [v2312-foss-2023a] for com or [11-foss-2023a] for org version")
-
-
-def is_inside(val: float, min: float, max: float) -> bool:
-    return (min < val) & (val < max)
 
 one_kibibyte = 1 << 10
 one_mebibyte = 1 << 20
