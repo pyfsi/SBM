@@ -1,0 +1,15 @@
+#!/bin/bash
+
+rm -rf postProcessing
+
+rm -rf processor*
+
+rm -rf 0.*
+rm -rf 1
+
+rm -rf log.*
+
+rm -rf dynamicCode
+rm -rf constant/polyMesh
+rm -rf constant/boundaryData
+rm -rf sbm_files

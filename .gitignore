@@ -1,0 +1,8 @@
+**/dynamicCode/*
+**/sbm_files/*
+**/boundaryData/*
+.idea/*
+.vscode/*
+
+# ignore python caches
+**/__pycache__/*

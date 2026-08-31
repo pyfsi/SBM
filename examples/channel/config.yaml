@@ -1,0 +1,25 @@
+purge_boundary_data: True     # Purges old boundary data directory
+profile_run:         True    # Profile code execution
+packages:
+  cfd_program:  OpenFOAM
+  cfd_version:  v2312-foss-2023a
+  python_version: Anaconda3-python/2023.09-0
+cfd:
+  dimension:  3               # Number of dimension
+  start_time: 0               # Start time of simulation
+  end_time: 0.1               # End time of simulation
+  delta_time: 1e-4            # Time step size
+  inlet_name: inlet           # Case sensitive. Name of inlet boundary patch
+  fluid_name: Water           # Case sensitive. Corresponds to alpha.<fluid_name> defined in OpenFOAM case
+  rho_g:  1.225               # Density of gas
+  rho_l:  998.2               # Density of liquid
+sbm:
+  seed: 1                     # Seed for random. Set to None for pseudo-RNG. Type (int, float, str, bytes, and bytearray) possible as seed.
+  t_unit: 0.01                # Interval for bubble insertion
+  mass_gas: 2.0e-7              # Mass of gas to be introduced
+  mass_bubble_min:  5e-9      # min mass of single bubble to be inserted. Recommendation: 10% of mass_gas
+  mass_bubble_max:  1e-8      # max mass of single bubble to be inserted. Recommendation: 20% of mass-gas
+  mass_gas_tol:  1e-9         # Tolerance on the gas mass to be introduced in domain over a time 'tunit'
+  velocity:         1         # Velocity of the mixture  to be introduced in domain
+  intersect_boundary: True    # Allows bubbles to instersect domain boundary
+  intersect_bubble: True      # Allows bubbles to intersect each other
