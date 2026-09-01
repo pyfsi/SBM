@@ -1,10 +1,11 @@
 from utils import np, sys, os, random, logging
 from utils import PI, SBM_OUTPUT
+from .plotter import Plotter
 
 logger = logging.getLogger(__name__)
 
 class InletModel():
-    def __init__(self, config, face_list, normal_inlet):
+    def __init__(self, config, face_list, normal_inlet, plotter):
 
         # configuration
         self.t_start = float(config["cfd"]["start_time"])
@@ -24,7 +25,7 @@ class InletModel():
         self.face_list = face_list # ID - X - Y - Z - Area
         self.normal_inlet = normal_inlet
 
-        # Initializing velocity and phase fraction arrays
+        # initializing velocity and phase fraction arrays
         self.time = np.arange(self.t_start, self.t_end+self.timestep_size, self.timestep_size)
         n_time_step = len(self.time)
         self.velocity = np.ones([len(face_list), n_time_step, 3], dtype=np.float64)
@@ -32,6 +33,9 @@ class InletModel():
         self.velocity[:, :, 1] = self.velocity_bc * normal_inlet[1]
         self.velocity[:, :, 2] = self.velocity_bc * normal_inlet[2]
         self.alpha = np.ones([len(face_list), n_time_step, 1], dtype=np.float64)
+
+        # plotter
+        self.plotter = plotter
 
     def _convert_relative_time_idx(self, block_idx: int, val: int) -> int:
         '''
@@ -44,7 +48,18 @@ class InletModel():
         '''
         return block_idx * int(self.block_size / self.timestep_size) + val
 
-    def sample_bubble_coord(self, face_idx_bounds, time_idx_bounds, bubble_mass_bounds):
+    def sample_random(self, face_idx_bounds: list, time_idx_bounds: list, mass_bounds: list):
+        '''
+        Sample bubble parameters from predefined statistical distributions.
+        Args:
+            face_idx_bounds: lower and upper bounds for face index
+            time_idx_bounds: lower and upper bounds for time index
+            mass_bounds: lower and upper bounds for mass of one bubble
+
+        Returns:
+            Returns face_idx, time_idx, mass
+
+        '''
         # sample cell index for spatial coordinates
         face_idx = random.randint(face_idx_bounds[0], face_idx_bounds[1])
 
@@ -52,11 +67,25 @@ class InletModel():
         time_idx = random.randint(time_idx_bounds[0], time_idx_bounds[1])
 
         # sample bubble mass
-        bubble_mass = random.uniform(bubble_mass_bounds[0], bubble_mass_bounds[1])
+        mass_sample = random.uniform(mass_bounds[0], mass_bounds[1])
 
-        return face_idx, time_idx, bubble_mass
+        return face_idx, time_idx, mass_sample
 
-    def define_bubble(self, face_idx, time_idx, block_idx, bubble_mass):
+    def define_bubble(self, face_idx, time_idx, mass_sample, block_idx):
+        '''
+        Set volume of fluid fraction and velocity cells within a bubble to their prescribed values.
+
+        Args:
+            face_idx: index for inlet faces array
+            time_idx: index for time array
+            mass_sample: mass of one bubble
+            block_idx: index for insertion block
+
+        Returns:
+            is_bubble_defined: boolean describing validity of bubble
+            mass_bubble_cells: mass of cells enclosed by the bubble
+        '''
+
         # alias
         t_start = self.t_start
         t_end = self.t_end
@@ -75,7 +104,7 @@ class InletModel():
         bubble_center = bubble_coord[1:4] - (velocity_bc * bubble_time) * normal_inlet[:] # X - Y - Z
 
         # calculate gas radius assuming spherical bubble
-        radius_gas = ((3.0*bubble_mass)/(4.0*PI*density_gas))**(1.0/3.0)
+        radius_gas = ((3.0*mass_sample)/(4.0*PI*density_gas))**(1.0/3.0)
 
         rel_cell_time = bubble_time - t_start - int((bubble_time-t_start)/block_size) * block_size
         # Checks below prevents intersection with start and end of t_unit domain
@@ -123,26 +152,36 @@ class InletModel():
         bubble_mass_defined = cell_area_inside_bubble * velocity_bc * timestep_size * density_gas
 
         # return False if defined bubble mass is smaller than expected
+        # and bubble is not allowed to intersect boundary
         if not intersect_boundary:
-            if (bubble_mass-bubble_mass_defined) > avg_gas_mass_per_cell:
+            if (mass_sample-bubble_mass_defined) > avg_gas_mass_per_cell:
                 return False, 0.0
 
         # set alpha and velocity fields and defined gas mass
         self.alpha[face_idx_in_bubble, time_idx_in_bubble, 0] = 0.0
         self.velocity[face_idx_in_bubble, time_idx_in_bubble, :] = velocity_bc * normal_inlet[:]
-        mg_defined = cell_area_inside_bubble * density_gas * velocity_bc * timestep_size
+        mass_bubble_cells = cell_area_inside_bubble * density_gas * velocity_bc * timestep_size
 
-        return True, mg_defined
+        return True, mass_bubble_cells
 
-    def insert_bubbles(self, block_idx) -> float:
+    def insert_bubbles(self, block_idx: int) -> float:
+        '''
+        Iteratively insert bubble to the block until target mass has been reached.
+
+        Args:
+            block_idx: index for insertion block
+
+        Returns:
+            mass_inserted: total mass of cells enclosed by defined bubbles.
+        '''
         # aliases
-        mg_per_block = self.mg_per_block
+        mass_per_block = self.mg_per_block
         tol_mg = self.tol_mg
         face_list = self.face_list
         block_size = self.block_size
         timestep_size = self.timestep_size
-        mg_min = self.mg_min
-        mg_max = self.mg_max
+        mass_lower_bound = self.mg_min
+        mass_upper_bound = self.mg_max
 
         # calc time indices
         timesteps_per_block = int(block_size / timestep_size)
@@ -150,38 +189,48 @@ class InletModel():
         max_time_at_blockidx = self._convert_relative_time_idx(block_idx, timesteps_per_block - 1)
 
         iter = 0
-        mg_inserted = 0.0
+        mass_inserted = 0.0
         # iterate until mass of inserted gas is within tolerance of target mass
-        while abs(mg_per_block-mg_inserted) > (tol_mg):
-            # calculate bounds for bubble sampling
+        while abs(mass_per_block-mass_inserted) > (tol_mg):
+            # calculate bounds of sample space for bubble parameters
             face_idx_bounds = [0, len(face_list) - 1]
             time_idx_bounds = [min_time_at_blockidx, max_time_at_blockidx]
-            bubble_mass_bounds = [
-                min((mg_min, mg_per_block - mg_inserted)),
-                min((mg_max, mg_per_block - mg_inserted))
+            mass_bounds = [
+                min((mass_lower_bound, mass_per_block - mass_inserted)),
+                min((mass_upper_bound, mass_per_block - mass_inserted))
             ]
 
-            face_idx, time_idx, bubble_mass = self.sample_bubble_coord(face_idx_bounds, time_idx_bounds, bubble_mass_bounds)
-            is_bubble_defined, mg_defined = self.define_bubble(face_idx, time_idx, block_idx, bubble_mass)
+            face_idx, time_idx, mass_sample = self.sample_random(face_idx_bounds, time_idx_bounds, mass_bounds)
+            is_bubble_defined, mass_bubble_cells = self.define_bubble(face_idx, time_idx, mass_sample, block_idx)
+
+            if self.plotter:
+                self.plotter.update_sample_distribution(mass_sample)
 
             if is_bubble_defined:
-                mg_inserted += mg_defined
+                mass_inserted += mass_bubble_cells
                 iter = 0
 
-                # print for debugging
-                logger.info(f"\t\t inserted at face_idx={face_idx}, time_idx={time_idx}, m_b={bubble_mass}")
+                # run plotter
+                if self.plotter:
+                    self.plotter.update_data(face_idx, time_idx)
+                    self.plotter.update_distribution(mass_bubble_cells)
+                    self.plotter.update_residual(mass_per_block, mass_inserted)
+                    self.plotter.plot_bubble_insertion()
+
+                # log face_idx, time_idx, and bubble mass
+                logger.info(f"\t\t inserted at face_idx={face_idx}, time_idx={time_idx}, m_b={mass_sample}")
             else:
                 iter = iter+1
 
             if iter > 1000:
                 raise RuntimeError("inlet_modelling took longer than 1000 iterations.")
 
-        return mg_inserted
+        return mass_inserted
 
 def inlet_modelling(config):
     print(f"Running inlet_modelling")
 
-    # configuration
+    # read configuration
     t_start = float(config["cfd"]["start_time"])
     t_end = float(config["cfd"]["end_time"])
     timestep_size = float(config["cfd"]["delta_time"])
@@ -203,21 +252,29 @@ def inlet_modelling(config):
     face_list = np.load(os.path.join(output_path, "inletPython.npy"))
     normal_inlet = np.load(os.path.join(output_path, "normalInletPython.npy"))
 
-    # initialize inlet model class
-    inlet_model = InletModel(config, face_list, normal_inlet)
+    # initialize distribution plotter
+    activate_plotter = config["activate_plotter"]
+    plotter = None
+    if activate_plotter:
+        plotter = Plotter(config)
 
-    # the random generator selects:
-    # - the center point of a bubble, both in inlet plane and in time
-    # - the bubble mass
+    # initialize inlet model class
+    inlet_model = InletModel(config, face_list, normal_inlet, plotter)
+
+    # iterate through every insertion blocks
     n_blocks = int((t_end-t_start)/block_size)
-    logger.info(f"Between t_start {t_start} s and t_end {t_end} s, {n_blocks} intervals of {block_size} s need to be defined.")
-    for block_idx in range(n_blocks): # no insertion at last time step
+    logger.info(f"Discretized {n_blocks} intervals of {block_size} s between t_start {t_start} s and t_end {t_end} s.")
+    for block_idx in range(n_blocks):
         start_msg = f"Start bubble calculation for time interval {block_idx}"
         logger.info(start_msg)
         print(start_msg)
-        mg_inserted = inlet_model.insert_bubbles(block_idx)
-        logger.info(f"\t Mass of inserted gas: {mg_inserted} kg. (Target mass: {mg_per_block} kg).")
+        mass_inserted = inlet_model.insert_bubbles(block_idx)
+        logger.info(f"\t Mass of inserted gas: {mass_inserted} kg. (Target mass: {mg_per_block} kg).")
     logger.info(f"Inlet model iteration loop ended.")
+
+    # save plot
+    if activate_plotter:
+        plotter.save_plot(output_path)
 
     # Write alpha and velocity profiles
     logger.info("Saving inlet profile to Python (numpy) npy-files.")
