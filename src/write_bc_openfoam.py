@@ -181,7 +181,8 @@ def write_bc_openfoam(config):
     logger.info("Writing boundary condition to folder 'boundaryData'.")
     args = [delta_time, boundary_inlet_path, alpha_name, n_inlet_points, U_inlet, VOF_inlet, time_inlet]
     partial_write = partial(write_time_step, args=args)
-    n_workers = os.cpu_count()
+    n_workers = min(8, os.cpu_count())
+    logger.info(f"Using {n_workers} threads for writing routine.")
     with ThreadPoolExecutor(max_workers=n_workers) as executor:
         executor.map(partial_write, np.arange(len(time_inlet)))
     logger.info("Boundary condition was successfully saved in 'boundaryData'.")
