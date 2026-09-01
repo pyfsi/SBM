@@ -5,7 +5,7 @@
 # The values for the boundary condition are then written by running the third script ("write_bc_<solver>.py")
 
 from utils import os, yaml, shutil, logging
-from utils import get_openfoam_type, memory_profile, modulo
+from utils import get_openfoam_type, memory_profiler, modulo
 from utils import SBM_OUTPUT
 import cProfile
 
@@ -66,7 +66,7 @@ def main(config):
 
     # Read CFD inlet data
     logger.info("========================Start read_inlet========================")
-    with memory_profile(logger, func_name="read_inlet"):
+    with memory_profiler(logger, func_name="read_inlet", activate=True):
         if cfd_program.lower() == "openfoam":
             from src.read_inlet_openfoam import read_inlet_openfoam
             read_inlet_openfoam(config)
@@ -80,13 +80,13 @@ def main(config):
     # model inlet boundary conditions
     logger.info("========================Start inlet_modelling========================")
     from src.inlet_modelling import inlet_modelling
-    with memory_profile(logger, func_name="inlet_modelling"):
+    with memory_profiler(logger, func_name="inlet_modelling", activate=True):
         inlet_modelling(config)
     logger.info("========================End inlet_modelling========================")
 
     # Write output
     logger.info("========================Start write_bc========================")
-    with memory_profile(logger, func_name="write_bc"):
+    with memory_profiler(logger, func_name="write_bc", activate=True):
         if cfd_program.lower() == "openfoam":
             from src.write_bc_openfoam import write_bc_openfoam
             write_bc_openfoam(config)

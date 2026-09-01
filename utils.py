@@ -139,27 +139,30 @@ one_mebibyte = 1 << 20
 one_gibibyte = 1 << 30
 mem_unit_size = one_mebibyte
 @contextmanager
-def memory_profile(logger, func_name: str):
-    tracemalloc.start()
+def memory_profiler(logger, func_name: str, activate: bool):
+    if activate:
+        tracemalloc.start()
 
-    yield
+        yield
 
-    current, peak = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
+        current, peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
 
-    # choose memory unit for printing
-    if is_inside(peak, min=one_gibibyte, max=100*one_gibibyte):
-        mem_unit = "GiB"
-        mem_unit_size = one_gibibyte
-    elif is_inside(peak, min=one_mebibyte, max=one_gibibyte):
-        mem_unit = "MiB"
-        mem_unit_size = one_mebibyte
-    elif is_inside(peak, min=0, max=one_mebibyte):
-        mem_unit = "KiB"
-        mem_unit_size = one_kibibyte
+        # choose memory unit for printing
+        if is_inside(peak, min=one_gibibyte, max=100*one_gibibyte):
+            mem_unit = "GiB"
+            mem_unit_size = one_gibibyte
+        elif is_inside(peak, min=one_mebibyte, max=one_gibibyte):
+            mem_unit = "MiB"
+            mem_unit_size = one_mebibyte
+        elif is_inside(peak, min=0, max=one_mebibyte):
+            mem_unit = "KiB"
+            mem_unit_size = one_kibibyte
+        else:
+            mem_unit = "GiB"
+            mem_unit_size = one_gibibyte
+
+        logger.info(f"{func_name} memory allocation in [{mem_unit}]")
+        logger.info(f"\t Peak = {peak / mem_unit_size:,.3f}; Final = {current / mem_unit_size:,.3f}")
     else:
-        mem_unit = "GiB"
-        mem_unit_size = one_gibibyte
-
-    logger.info(f"{func_name} memory allocation in [{mem_unit}]")
-    logger.info(f"\t Peak = {peak / mem_unit_size:,.3f}; Final = {current / mem_unit_size:,.3f}")
+        yield
