@@ -3,6 +3,7 @@ import sys, os, shutil
 from pathlib import Path
 from contextlib import redirect_stdout
 import multiprocessing
+from functools import partial
 
 # text manipulation + configuration modules
 import re
