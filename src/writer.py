@@ -16,13 +16,15 @@ class Writer():
 
         # reference to data storage
         self.data = data
-        self.face_list = data["inlet_faces"]
 
         # logger
         self.logger = logger
 
     def initialize(self):
-        pass
+        self.inlet_faces = self.data["inlet_faces"]
+        self.alpha = self.data["alpha"]
+        self.velocity = self.data["velocity"]
+        self.time = self.data["time"]
 
     def run(self):
         self._prepare_boundary_data_dir()
@@ -93,7 +95,7 @@ class Writer():
     def _prepare_boundary_data_dir(self):
         cwd = self.cwd
         inlet_name = self.inlet_name
-        face_list = self.data["inlet_faces"]
+        face_list = self.inlet_faces
 
         # Prepare OpenFOAM-directory
         self.logger.info("Creating 'boundaryData' folder.")
@@ -117,8 +119,8 @@ class Writer():
         with open(points_out_path, 'a+') as f:
             f.write(str(n_faces)+'\n')
             f.write('('+'\n')
-            for j in range(n_faces):
-                f.write('(' + str(face_list[j, 1]) + ' ' + str(face_list[j, 2]) + ' ' + str(face_list[j, 3]) + ') \n')
+            for fid in range(n_faces):
+                f.write('(' + str(face_list[fid, 1]) + ' ' + str(face_list[fid, 2]) + ' ' + str(face_list[fid, 3]) + ') \n')
             f.write(')'+'\n')
 
     def _write_boundary_data(self):
@@ -126,22 +128,21 @@ class Writer():
         time_step = self.time_step
         boundary_inlet_path = os.path.join(self.boundary_data_path, "inlet")
         alpha_name = self.alpha_name
-        n_faces = len(self.data["inlet_faces"][:, 0])
-        U_inlet = self.data["velocity"]
-        VOF_inlet = self.data["alpha"]
-        time_inlet = self.data["time"]
+        n_faces = len(self.inlet_faces[:, 0])
+        velocity = self.velocity
+        alpha = self.alpha
+        time = self.time
 
         # Write velocity and volume fraction for water at each time step.
         self.logger.info("Writing boundary condition to folder 'boundaryData'.")
-        args = [time_step, boundary_inlet_path, alpha_name, n_faces, U_inlet, VOF_inlet, time_inlet]
+        args = [time_step, boundary_inlet_path, alpha_name, n_faces, velocity, alpha, time]
         partial_write = partial(self.__write_time_step, args=args)
         n_workers = max(8, os.cpu_count())
         self.logger.info(f"Using {n_workers} threads for writing routine.")
-        time_steps = [i for i in range(len(time_inlet))]
+        time_steps = [tid for tid in range(len(time))]
         with ThreadPoolExecutor(max_workers=n_workers) as executor:
             executor.map(partial_write, time_steps)
         self.logger.info("Boundary condition was successfully saved in 'boundaryData'.")
-
 
     # === Private functions ===
     def __write_header(self, file_loc: str, class_name: str, object_name: str):
@@ -168,18 +169,17 @@ class Writer():
             f.write("\n")
             f.write(r'// ************************************************************************* //' + "\n")
 
-    def __write_time_step(self, i, args):
+    def __write_time_step(self, tid, args):
         # arguments
         time_step = args[0]
         boundary_inlet_path = args[1]
         alpha_name = args[2]
         n_faces = args[3]
-        U_inlet = args[4]
-        VOF_inlet = args[5]
-        time_inlet = args[6]
+        velocity = args[4]
+        alpha = args[5]
 
-
-        time_i = time_inlet[i]
+        time = args[6]
+        time_i = time[tid]
         trunc_time_i = truncate(time_i, time_step)
 
         # Set location of files
@@ -202,15 +202,15 @@ class Writer():
         with open(U_out_path, 'a+') as f:
             f.write('//Data points'+'\n')
             f.write(str(n_faces)+'\n'+'('+'\n')
-            for j in range(n_faces):
-                f.write('(' + str(U_inlet[j, i, 0]) + ' ' + str(U_inlet[j, i, 1]) + ' ' + str(U_inlet[j, i, 2]) + ') \n')
+            for fid in range(n_faces):
+                f.write('(' + str(velocity[fid, tid, 0]) + ' ' + str(velocity[fid, tid, 1]) + ' ' + str(velocity[fid, tid, 2]) + ') \n')
             f.write(')'+'\n')
 
         with open(VOFw_out_path, 'a+') as f:
             f.write('//Data points'+'\n')
             f.write(str(n_faces)+'\n'+'('+'\n')
-            for j in range(n_faces):
-                f.write(str(VOF_inlet[j,i,0])+'\n')
+            for fid in range(n_faces):
+                f.write(str(alpha[fid,tid,0])+'\n')
             f.write(')'+'\n')
 
         # Write OpenFOAM-footer
