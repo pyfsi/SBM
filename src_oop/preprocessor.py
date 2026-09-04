@@ -104,6 +104,9 @@ class Preprocessor():
         self.cwd = os.getcwd()
         self.fo_dir_path = None
 
+    def initialize(self):
+        pass
+
     def run(self):
         # run routine
         self._create_FO_directory()

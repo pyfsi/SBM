@@ -3,24 +3,30 @@ from utils import np, os, subprocess, linecache
 class Reader():
     TOLERANCE = 0.01
 
-    def __init__(self, config, data):
+    def __init__(self, config, data, logger):
         cfd_prog = str(config["packages"]["cfd_program"])
         cfd_version = str(config["packages"]["cfd_version"])
         self.cfd_module = f"{cfd_prog}/{cfd_version}"
         self.dimension = int(config["cfd"]["dimension"])
         self.inlet_name = str(config["cfd"]["inlet_name"])
         self.time_start = str(config["model"]["time"]["start"])
-        self.data = data
 
         self.output_path = str(config.get("_output_path"))
         self.openfoam_type = str(config.get("_openfoam_type"))
 
-        # protected variables
+        # inlet cell names
         self.inlet_cell_data_names = None
         if self.openfoam_type=="org":
             self.inlet_cell_data_names = ["Ccx", "Ccy", "Ccz", "area"]
         else:
             self.inlet_cell_data_names = ["Cx", "Cy", "Cz", "area"]
+
+        # reference to data storage
+        self.data = data
+
+        # logger
+        self.logger = logger
+
 
     def initialize(self):
         '''initialize data storage for inlet geometry'''

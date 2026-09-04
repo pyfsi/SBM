@@ -25,12 +25,11 @@ class Writer():
         pass
 
     def run(self):
-        self._check_inlet_boundary_condition()
         self._prepare_boundary_data_dir()
         self._write_boundary_data()
 
-    # === Protected functions ===
-    def _check_inlet_boundary_condition(self):
+    def check(self):
+        '''Check boundary condition definition.'''
         cwd = os.getcwd()
         time_start = self.time_start
         inlet_name = self.inlet_name
@@ -90,6 +89,7 @@ class Writer():
         except:
             os.remove(lineNr_setAvg_path)
 
+    # === Protected functions ===
     def _prepare_boundary_data_dir(self):
         cwd = self.cwd
         inlet_name = self.inlet_name

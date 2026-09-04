@@ -37,7 +37,8 @@ class SBM():
         self.data["alpha"] = None
         self.data["velocity"] = None
 
-    def check_settings(self):
+    def check_case(self):
+        # check SBM config
         self._check_time_settings()
         self._check_mass_settings()
         self._check_modules()
@@ -65,19 +66,21 @@ class SBM():
         self.preprocessor = Preprocessor(config)
 
         # reader
-        self.reader = Reader(config, data)
+        self.reader = Reader(config, data, self.logger)
 
         # inlet modelling
         self.model = Model(config, data, self.logger)
 
         # writer
         self.writer = Writer(config, data, self.logger)
+        self.writer.check()
 
         # plotter
         self.plotter = None
 
     def run(self):
         with self.logger.function_call(name="preprocessor"):
+            self.preprocessor.initialize()
             self.preprocessor.run()
 
         with self.logger.function_call(name="reader"):

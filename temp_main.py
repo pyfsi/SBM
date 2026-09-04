@@ -12,7 +12,7 @@ if __name__=="__main__":
 
     # SBM object
     sbm = SBM(config)
-    sbm.check_settings()
+    sbm.check_case()
     sbm.purge_previous()
     sbm.initialize()
     sbm.run()
