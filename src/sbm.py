@@ -1,4 +1,4 @@
-from utils import os, shutil, re
+from utils import os, shutil, re, np
 from utils import modulo
 
 # SBM components
@@ -13,23 +13,14 @@ class SBM():
     def __init__(self, config):
         # config dictionary
         self.config = config
+        self.time_start = float(config["model"]["time"]["start"])
+        self.time_end = float(config["model"]["time"]["end"])
+        self.time_step = float(config["model"]["time"]["step"])
+        self.time_block = float(config["model"]["time"]["block"])
+        self.velocity_bc = float(config["model"]["velocity"])
+        self.inlet_name = str(config["cfd"]["inlet_name"])
 
-        # make sbm output dir
-        self.cwd = os.getcwd()
-        sbm_output_path = os.path.join(self.cwd, "sbm_files")
-        # remove previous sbm output files
-        if os.path.exists(sbm_output_path):
-            shutil.rmtree(sbm_output_path)
-            # print(f"Deleting previous SBM output files.")
-        os.mkdir(sbm_output_path)
-
-        # === add attributes to config ===
-        self.config["_output_path"] = sbm_output_path
-        is_cfd_solver_openfoam = (self.config["packages"]["cfd_program"].lower() == "openfoam")
-        if is_cfd_solver_openfoam:
-            self.config["_openfoam_type"] = self._get_openfoam_type()
-
-        # === data storage ===
+        # data storage per insertion block
         self.data = {}
         self.data["inlet_faces"] = None
         self.data["inlet_normal"] = None
@@ -37,27 +28,31 @@ class SBM():
         self.data["alpha"] = None
         self.data["velocity"] = None
 
+        # create 'sbm_files'
+        self._make_output_dir()
+        self._add_time_settings()
+
     def check_case(self):
         # check SBM config
         self._check_time_settings()
         self._check_mass_settings()
         self._check_modules()
 
-    def purge_previous(self):
+    def purge_boundary_data(self):
         purge_boundary_data = self.config["settings"]["purge_boundary_data"]
+        self.config["_boundary_data_path"] = os.path.join(self.cwd, "constant", "boundaryData")
+
         if purge_boundary_data:
-            boundary_data_path = os.path.join(self.cwd, "constant", "boundaryData")
-            if os.path.exists(boundary_data_path):
-                shutil.rmtree(boundary_data_path)
+            if os.path.exists(self.config["_boundary_data_path"]):
+                shutil.rmtree(self.config["_boundary_data_path"])
         else:
             raise RuntimeError("'boundaryData' directory already exists.")
 
     def initialize(self):
-        '''Initialize SBM components.'''
         config = self.config
         data = self.data
 
-        # === initialize all sbm components ===
+        # === initialize sbm components ===
         # diagnostics
         # self.profiler = Profiler(config)
         self.logger = Logger(config)
@@ -87,13 +82,12 @@ class SBM():
             self.reader.initialize()
             self.reader.run()
 
-        with self.logger.function_call(name="model"):
-            self.model.initialize()
-            self.model.run()
+        self._initialize_cells()
+        self._prepare_boundary_data_dir()
+        self._iterate()
 
-        with self.logger.function_call(name="writer"):
-            self.writer.initialize()
-            self.writer.run()
+        # save
+        self._save_csv()
 
     def finalize(self):
         # attributes
@@ -108,8 +102,8 @@ class SBM():
         else:
             filenames = []
 
+        # move files to 'sbm_files'
         for file in filenames:
-            # move area postProcess file
             target_area_path = os.path.join(output_path, file)
             if os.path.exists(target_area_path):
                 os.remove(target_area_path)
@@ -118,6 +112,38 @@ class SBM():
                 shutil.move(area_path, output_path)
 
     # == protected functions ==
+    def _make_output_dir(self):
+        # make sbm output dir
+        self.cwd = os.getcwd()
+        sbm_output_path = os.path.join(self.cwd, "sbm_files")
+        # remove previous sbm output files
+        if os.path.exists(sbm_output_path):
+            shutil.rmtree(sbm_output_path)
+            print(f"Deleting previous SBM output files.")
+        os.mkdir(sbm_output_path)
+
+        # === add attributes to config ===
+        self.config["_output_path"] = sbm_output_path
+        is_cfd_solver_openfoam = (self.config["packages"]["cfd_program"].lower() == "openfoam")
+        if is_cfd_solver_openfoam:
+            self.config["_openfoam_type"] = self._get_openfoam_type()
+
+    def _add_time_settings(self):
+        time_start = self.time_start
+        time_end = self.time_end
+        time_step = self.time_step
+        time_block = self.time_block
+
+        timesteps_per_block = int(time_block/time_step)
+        self.config["_timesteps_per_block"] = timesteps_per_block
+        buffer_size = int(timesteps_per_block*0.5) # TODO make radius dependent ?
+        self.config["_buffer_size"] = buffer_size
+
+        time_idx_start = 0
+        time_idx_end = int((time_end-time_start)/time_step) + 1 + buffer_size
+        time_ids = np.arange(time_idx_start, time_idx_end, 1)
+        self.data["time"] = time_ids * self.time_step
+
     def _check_time_settings(self):
         # attributes
         time_config = self.config["model"]["time"]
@@ -188,3 +214,89 @@ class SBM():
         raise ValueError("The cfd_version variable is unknown for OpenFOAM. \
                             Use the format [v2312-foss-2023a] for com or [11-foss-2023a] for org version")
 
+    def _initialize_cells(self):
+        '''initialize arrays for time, alpha, and velocity'''
+        n_faces = len(self.data["inlet_faces"])
+        n_timesteps = len(self.data["time"])
+        self.data["alpha"] = np.ones([n_faces, n_timesteps, 1], dtype=np.float64)
+        self.data["velocity"] = np.ones([n_faces, n_timesteps, 3], dtype=np.float64)
+        self.data["velocity"][:, :, :] *= self.velocity_bc * self.data["inlet_normal"][None, None, :]
+
+    def _prepare_boundary_data_dir(self):
+        cwd = self.cwd
+        inlet_name = self.inlet_name
+        inlet_faces = self.data["inlet_faces"]
+
+        # Prepare OpenFOAM-directory
+        self.logger.info("Creating 'boundaryData' folder.")
+        constant_path = os.path.join(cwd, "constant")
+        if not os.path.exists(constant_path):
+            raise RuntimeError("'constant' folder does not exist in the OpenFOAM case directory.")
+        self.config["_boundary_data_path"] = os.path.join(cwd, "constant", "boundaryData")
+
+        # Create boundaryData
+        os.mkdir(os.path.join(cwd, "constant", "boundaryData"))
+        os.mkdir(os.path.join(cwd, "constant", "boundaryData", inlet_name))
+        boundary_inlet_path = os.path.join(cwd, "constant", "boundaryData", inlet_name)
+        # command = f"touch {boundary_inlet_path}/points"
+        # subprocess.run(command, shell=True)
+
+        # Write 'points'-file
+        points_out_path = os.path.join(boundary_inlet_path, "points")
+        n_faces = len(inlet_faces[:, 0])
+        with open(points_out_path, 'w') as f:
+            f.write(str(n_faces)+'\n')
+            f.write('('+'\n')
+            for fid in range(n_faces):
+                f.write('(' + str(inlet_faces[fid, 1]) + ' ' + str(inlet_faces[fid, 2]) + ' ' + str(inlet_faces[fid, 3]) + ') \n')
+            f.write(')'+'\n')
+
+
+    def _iterate(self):
+        '''model and write for every insertion block'''
+        time_start = self.time_start
+        time_end = self.time_end
+        time_block = self.time_block
+        n_blocks = int((time_end-time_start)/time_block)
+
+        # initialize model buffers
+        self.model.initialize_buffer()
+        n_check = np.sum(self.model.buffer[:,:,0])
+        temp_slice_t10 = self.data["alpha"][:,10,0]
+        temp_slice_t11 = self.data["alpha"][:,11,0]
+
+        self.logger.info(f"Discretized {n_blocks} intervals of {time_block} s between time_start {time_start} s and time_end {time_end} s.")
+        for block_idx in range(n_blocks):
+            n_alpha_old = np.sum(self.data["alpha"])
+            # inlet modelling
+            with self.logger.function_call(name="model"):
+                self.model.initialize(block_idx)
+                self.model.run(block_idx)
+
+            # writer
+            with self.logger.function_call(name="writer"):
+                self.writer.initialize(block_idx)
+                self.writer.run()
+
+    def _save_csv(self):
+        # print csv to visualize pre-inlet domain
+        self.logger.info("Saving inlet profile to csv-files.")
+        csv_file_path = os.path.join(self.config["_output_path"], "inlet_data.csv")
+        inlet_all_variable = np.concatenate((self.data["alpha"][:,:,:], self.data["velocity"][:,:,:]), axis=2)
+        csv_header = "x_coord,y_coord,z_coord,alpha,velocity_x,velocity_y,velocity_z"
+
+        # get cell coordinates in x,y,z space
+        n_faces = len(self.data["inlet_faces"])
+        n_timesteps = len(self.data["time"])
+        face_list_extended = np.array([self.data["inlet_faces"][:, 1:4]] * n_timesteps)
+        time_velocity_product = np.tensordot(self.data["time"][:], self.velocity_bc * self.data["inlet_normal"][:], axes=0)
+        cell_coords = face_list_extended[:, :, :] - time_velocity_product[:, None, : ]
+        cell_coords = np.swapaxes(cell_coords, 0, 1)
+        cell_coords = np.reshape(cell_coords, (n_timesteps * n_faces, -1), order='C')
+
+        # save csv
+        inlet_var_reshaped = np.reshape(inlet_all_variable, (n_timesteps * n_faces, -1), order="C")
+        inlet_ds = np.concatenate((cell_coords, inlet_var_reshaped), axis=1)
+        np.savetxt(csv_file_path, inlet_ds, fmt='%.6e',
+                    header=csv_header, delimiter=",", comments='')
+        self.logger.info("Inlet profile saved to csv-files.")

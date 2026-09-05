@@ -1,6 +1,4 @@
-from utils import os, yaml, shutil
-from utils import get_openfoam_type, memory_profiler, modulo
-from utils import SBM_OUTPUT
+from utils import os, yaml
 
 from src.sbm import SBM
 
@@ -12,7 +10,7 @@ if __name__=="__main__":
     # SBM object
     sbm = SBM(config)
     sbm.check_case()
-    sbm.purge_previous()
+    sbm.purge_boundary_data()
     sbm.initialize()
     sbm.run()
     sbm.finalize()

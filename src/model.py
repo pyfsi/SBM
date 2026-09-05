@@ -2,13 +2,15 @@ from utils import np, random, os
 from utils import PI
 
 class Model():
+    MAX_INSERT_ITER = 1000
+
     def __init__(self, config, data, logger):
         # configuration
         self.density_gas = float(config["cfd"]["rho_g"])
-        self.t_start = float(config["model"]["time"]["start"])
-        self.t_end = float(config["model"]["time"]["end"])
+        self.time_start = float(config["model"]["time"]["start"])
+        self.time_end = float(config["model"]["time"]["end"])
         self.time_step = float(config["model"]["time"]["step"])
-        self.block_size = float(config["model"]["time"]["block"])
+        self.time_block = float(config["model"]["time"]["block"])
         self.mg_per_block = float(config["model"]["mass_g"]["per_block"])
         self.mg_tol = float(config["model"]["mass_g"]["tol"])
         self.mg_min = float(config["model"]["mass_g"]["min"])
@@ -17,7 +19,13 @@ class Model():
         self.intersect_boundary = config["model"]["intersect_boundary"]
         self.intersect_bubble = config["model"]["intersect_bubble"]
         self.seed = str(config["model"].get("seed", None))
+
         self.output_path = str(config.get("_output_path"))
+        self.timesteps_per_block = int(config.get("_timesteps_per_block"))
+        self.buffer_size = int(config.get("_buffer_size"))
+
+        # set seed
+        self._set_seed()
 
         # reference to data storage
         self.data = data
@@ -25,57 +33,40 @@ class Model():
         # logger
         self.logger = logger
 
-    def initialize(self):
-        '''initialize data storage for physical variables at the inlet'''
-        self.time = np.arange(self.t_start, self.t_end+self.time_step, self.time_step)
-
+    def initialize(self, block_idx):
+        # absolute time index and time array
+        abs_time_idx_block_start = self.timesteps_per_block * block_idx
+        abs_time_idx_block_end = self.timesteps_per_block * (block_idx+1) + self.buffer_size
+        self.abs_time_idx = np.arange(abs_time_idx_block_start, abs_time_idx_block_end, 1)
+        self.time = self.abs_time_idx * self.time_step + self.time_start
         self.n_timesteps = len(self.time)
-        self.n_faces = len(self.data["inlet_faces"])
+
         self.alpha = np.ones([self.n_faces, self.n_timesteps, 1], dtype=np.float64)
         self.velocity = np.ones([self.n_faces, self.n_timesteps, 3], dtype=np.float64)
-        self.velocity[:, :, 0] = self.velocity_bc * self.data["inlet_normal"][0]
-        self.velocity[:, :, 1] = self.velocity_bc * self.data["inlet_normal"][1]
-        self.velocity[:, :, 2] = self.velocity_bc * self.data["inlet_normal"][2]
+        self.velocity[:,:,:] = self.velocity_bc * self.data["inlet_normal"][None, None, :]
 
-    def run(self):
-        # read configuration
-        t_start = self.t_start
-        t_end = self.t_end
-        block_size = self.block_size
-        mg_per_block = self.mg_per_block
+    def initialize_buffer(self):
+        self.n_faces = len(self.data["inlet_faces"])
 
-        # inlet modelling
-        self._set_seed()
-        n_blocks = int((t_end-t_start)/block_size)
-        self.logger.info(f"Discretized {n_blocks} intervals of {block_size} s between t_start {t_start} s and t_end {t_end} s.")
-        for block_idx in range(n_blocks):
-            start_msg = f"Start bubble calculation for time interval {block_idx}"
-            self.logger.info(start_msg)
-            print(start_msg)
-            mass_inserted = self._insert_bubbles(block_idx)
-            self.logger.info(f"\t Mass of inserted gas: {mass_inserted} kg. (Target mass: {mg_per_block} kg).")
-        self.logger.info(f"Inlet model iteration loop ended.")
+        # buffer to pass alpha and velocity to next block iteration
+        self.buffer = np.ones([self.n_faces, self.buffer_size, 4], dtype=np.float64)
+        self.buffer[:,:,1:4] = self.velocity_bc * self.data["inlet_normal"][None, None, :]
+
+    def run(self, block_idx: int):
+        self._read_buffer()
+
+        start_msg = f"Start bubble calculation for time interval {block_idx}"
+        self.logger.info(start_msg)
+        print(start_msg)
+        mass_inserted = self._insert_bubbles(block_idx)
+        inserted_mass_msg = f"\t Mass of inserted gas: {mass_inserted} kg. (Target mass: {self.mg_per_block} kg)."
+        self.logger.info(inserted_mass_msg)
+
         self._pass_data()
 
-        # save
-        self._save_inlet_data()
-        self._save_csv()
-
-    def get_data(self):
-        return self.time, self.alpha, self.velocity
+        self._store_buffer()
 
     # ===== Protected functions =====
-    def _convert_relative_time_idx(self, block_idx: int, val: int) -> int:
-            '''
-            Convert time index relative to time blocks to absolute time index.
-            Args:
-                val: relative time index
-
-            Returns:
-                Returns the absolute time index
-            '''
-            return block_idx * int(self.block_size / self.time_step) + val
-
     def _set_seed(self):
         # set seed for random number generator
         seed = self.seed
@@ -123,45 +114,47 @@ class Model():
         '''
 
         # alias
-        t_start = self.t_start
-        t_end = self.t_end
+        time_start = self.time_start
+        time_end = self.time_end
         time_step = self.time_step
-        block_size = self.block_size
+        time_block = self.time_block
         density_gas = self.density_gas
         velocity_bc = self.velocity_bc
         intersect_boundary = self.intersect_boundary
         intersect_bubble = self.intersect_bubble
+        # arrays
+        time = self.time
         face_list = self.data["inlet_faces"]
         normal_inlet = self.data["inlet_normal"]
-        time = self.time
 
         bubble_coord = face_list[face_idx, :] # ID - X - Y - Z - area
         bubble_time = time[time_idx]
         bubble_center = bubble_coord[1:4] - (velocity_bc * bubble_time) * normal_inlet[:] # X - Y - Z
 
         # calculate gas radius assuming spherical bubble
-        radius_gas = ((3.0*mass_sample)/(4.0*PI*density_gas))**(1.0/3.0)
+        radius_bubble = ((3.0*mass_sample)/(4.0*PI*density_gas))**(1.0/3.0)
+        rel_cell_time = bubble_time - time_start - int((bubble_time-time_start)/time_block) * time_block
 
-        rel_cell_time = bubble_time - t_start - int((bubble_time-t_start)/block_size) * block_size
-        # Checks below prevents intersection with start and end of t_unit domain
-        intersect_with_start = bubble_time < radius_gas/velocity_bc
-        intersect_with_end = bubble_time > (t_end-radius_gas/velocity_bc)
+        # Checks below prevents intersection with start and end of the insertion block
+        intersect_with_start = bubble_time < (time_start+radius_bubble/velocity_bc)
+        intersect_with_end = bubble_time > (time_end-radius_bubble/velocity_bc)
         if intersect_with_start:
             return False, 0.0
         if intersect_with_end:
             return False, 0.0
 
-        # get space and time index (i and j) of bounding box
-        is_inside_radius = np.linalg.norm(face_list[:, 1:4] - bubble_coord[1:4], axis=1) < radius_gas
+        # get face and time index (i and j) of bounding box
+        is_inside_radius = np.linalg.norm(face_list[:, 1:4] - bubble_coord[1:4], axis=1) < radius_bubble
         face_idx_in_radius = is_inside_radius.nonzero()[0]
-        min_rel_time_idx_in_radius = int((rel_cell_time - radius_gas/velocity_bc) / time_step)
-        temp = (rel_cell_time + radius_gas/velocity_bc) // time_step
+        min_rel_time_idx_in_radius = int((rel_cell_time - radius_bubble/velocity_bc) / time_step)
+        temp = (rel_cell_time + radius_bubble/velocity_bc) // time_step
         max_rel_time_idx_in_radius = int(temp) + 1
 
         # convert from relative time idx
-        min_time_idx_in_radius = self._convert_relative_time_idx(block_idx, min_rel_time_idx_in_radius)
-        max_time_idx_in_radius = self._convert_relative_time_idx(block_idx, max_rel_time_idx_in_radius)
-        time_idx_in_radius = np.arange(min_time_idx_in_radius, max_time_idx_in_radius)
+        # min_time_idx_in_radius = self._convert_to_time_idx(block_idx, min_rel_time_idx_in_radius)
+        # max_time_idx_in_radius = self._convert_to_time_idx(block_idx, max_rel_time_idx_in_radius)
+        # time_idx_in_radius = np.arange(min_time_idx_in_radius, max_time_idx_in_radius)
+        time_idx_in_radius = np.arange(min_rel_time_idx_in_radius, max_rel_time_idx_in_radius) # relative time idx
 
         # create 3d tensor to describe the relative cell positions w.r.t. velocity times time
         face_list_extended = np.array([face_list[face_idx_in_radius, 1:4]] * len(time_idx_in_radius))
@@ -172,7 +165,7 @@ class Model():
         # get boolean field if cell is inside bubble
         displacement = cell_coords[:,:,:]-bubble_center[None,None,:]
         distance_sqr = np.sum(displacement*displacement, axis=2)
-        is_cell_inside_bubble = distance_sqr < radius_gas * radius_gas
+        is_cell_inside_bubble = distance_sqr < radius_bubble * radius_bubble
         face_idx_in_bubble = face_idx_in_radius[is_cell_inside_bubble.nonzero()[0]]
         time_idx_in_bubble = time_idx_in_radius[is_cell_inside_bubble.nonzero()[1]]
 
@@ -214,15 +207,13 @@ class Model():
         mass_per_block = self.mg_per_block
         mg_tol = self.mg_tol
         face_list = self.data["inlet_faces"]
-        block_size = self.block_size
-        time_step = self.time_step
         mass_lower_bound = self.mg_min
         mass_upper_bound = self.mg_max
 
         # calc time indices
-        timesteps_per_block = int(block_size / time_step)
-        min_time_at_blockidx = self._convert_relative_time_idx(block_idx, 0)
-        max_time_at_blockidx = self._convert_relative_time_idx(block_idx, timesteps_per_block - 1)
+        timesteps_per_block = self.timesteps_per_block
+        min_timeidx = 0 #self._convert_to_time_idx(block_idx, 0)
+        max_timeidx = timesteps_per_block - 1 #self._convert_to_time_idx(block_idx, timesteps_per_block - 1)
 
         iter = 0
         mass_inserted = 0.0
@@ -230,7 +221,7 @@ class Model():
         while abs(mass_per_block-mass_inserted) > (mg_tol):
             # calculate bounds of sample space for bubble parameters
             face_idx_bounds = [0, len(face_list) - 1]
-            time_idx_bounds = [min_time_at_blockidx, max_time_at_blockidx]
+            time_idx_bounds = [min_timeidx, max_timeidx]
             mass_bounds = [
                 min((mass_lower_bound, mass_per_block - mass_inserted)),
                 min((mass_upper_bound, mass_per_block - mass_inserted))
@@ -258,17 +249,53 @@ class Model():
             else:
                 iter = iter+1
 
-            if iter > 1000:
+            if iter > self.MAX_INSERT_ITER:
                 raise RuntimeError("inlet_modelling took longer than 1000 iterations.")
 
         return mass_inserted
 
     def _pass_data(self):
-        self.data["time"] = self.time
-        self.data["alpha"] = self.alpha
-        self.data["velocity"] = self.velocity
+        # self.data["time"] = self.time
+        abs_time_idx = self.abs_time_idx
+        self.data["alpha"][:, abs_time_idx, :] = self.alpha
+        self.data["velocity"][:, abs_time_idx, :] = self.velocity
 
-    def _save_inlet_data(self):
+    # === conversion ===
+    def _convert_to_time_idx(self, block_idx: int, rel_time_idx):
+        '''
+        Convert time index relative to time blocks to absolute time index.
+        Args:
+            rel_time_idx: relative time index
+
+        Returns:
+            the absolute time index
+        '''
+        return block_idx * self.timesteps_per_block + rel_time_idx
+
+    def _convert_to_rel_time_idx(self, block_idx: int, time_idx):
+        '''
+        Convert time index relative to time blocks to absolute time index.
+        Args:
+            time_idx: relative time index
+
+        Returns:
+            the absolute time index
+        '''
+        return time_idx - block_idx * self.timesteps_per_block
+
+    # === buffer operations ===
+    def _read_buffer(self):
+        b_size = self.buffer_size
+        self.alpha[:, :b_size, 0] = self.buffer[:,:,0]
+        self.velocity[:, :b_size, :] = self.buffer[:,:,1:4]
+
+    def _store_buffer(self):
+        b_size = self.buffer_size
+        self.buffer[:,:,0] = self.alpha[:, -b_size:, 0]
+        self.buffer[:,:,1:4] = self.velocity[:, -b_size:, :]
+
+    # === save ===
+    def _save_npy(self):
         self.logger.info("Saving inlet profile to npy-files.")
         np.save(os.path.join(self.output_path, "inlet_velocity.npy"), self.velocity)
         np.save(os.path.join(self.output_path, "inlet_alpha.npy"), self.alpha)

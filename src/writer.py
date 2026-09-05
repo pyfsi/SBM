@@ -1,11 +1,11 @@
-from utils import os, subprocess, shutil, partial, ThreadPoolExecutor
+from utils import os, np, subprocess, shutil, partial, ThreadPoolExecutor
 from utils import truncate
 
 class Writer():
     def __init__(self, config, data, logger):
         # configuration
         self.density_gas = float(config["cfd"]["rho_g"])
-        self.time_start = str(config["model"]["time"]["start"])
+        self.time_start = float(config["model"]["time"]["start"])
         self.time_step = float(config["model"]["time"]["step"])
         self.inlet_name = str(config["cfd"]["inlet_name"])
         self.alpha_name = "alpha."+config["cfd"]["alpha_name"]
@@ -13,6 +13,10 @@ class Writer():
         # paths
         self.cwd = os.getcwd()
         self.output_path = str(config.get("_output_path"))
+        self.boundary_data_path = str(config.get("_boundary_data_path"))
+
+        self.timesteps_per_block = int(config.get("_timesteps_per_block"))
+        self.buffer_size = int(config.get("_buffer_size"))
 
         # reference to data storage
         self.data = data
@@ -20,20 +24,24 @@ class Writer():
         # logger
         self.logger = logger
 
-    def initialize(self):
-        self.inlet_faces = self.data["inlet_faces"]
-        self.alpha = self.data["alpha"]
-        self.velocity = self.data["velocity"]
-        self.time = self.data["time"]
+    def initialize(self, block_idx):
+        # absolute time index and time array
+        abs_time_idx_block_start = self.timesteps_per_block * block_idx
+        abs_time_idx_block_end = self.timesteps_per_block * (block_idx+1) #TODO+ self.buffer_size
+        self.abs_time_idx = np.arange(abs_time_idx_block_start, abs_time_idx_block_end, 1)
+        self.time = self.abs_time_idx * self.time_step + self.time_start
+
+        self.inlet_faces = self.data["inlet_faces"][:,:]
+        self.alpha = self.data["alpha"][:,self.abs_time_idx,:]
+        self.velocity = self.data["velocity"][:,self.abs_time_idx,:]
 
     def run(self):
-        self._prepare_boundary_data_dir()
         self._write_boundary_data()
 
     def check(self):
         '''Check boundary condition definition.'''
         cwd = os.getcwd()
-        time_start = self.time_start
+        time_start = f"{self.time_start:g}"
         inlet_name = self.inlet_name
         alpha_name = self.alpha_name
 
@@ -43,7 +51,7 @@ class Writer():
         lineNrU_path = os.path.join(cwd, "lineNr_U")
         lineNameNr = int(open(lineNrU_path, 'r').readline())
         lineTypeU = lineNameNr+1  # inlet BC type is defined on this line
-        U_path = os.path.join(cwd, str(time_start), "U")
+        U_path = os.path.join(cwd, time_start, "U")
         readTypeU = (open(U_path).readlines())[lineTypeU]
         boundaryConditionU = (readTypeU.split())[-1][0:-1]
         os.remove(lineNrU_path)
@@ -92,41 +100,11 @@ class Writer():
             os.remove(lineNr_setAvg_path)
 
     # === Protected functions ===
-    def _prepare_boundary_data_dir(self):
-        cwd = self.cwd
-        inlet_name = self.inlet_name
-        face_list = self.inlet_faces
-
-        # Prepare OpenFOAM-directory
-        self.logger.info("Creating 'boundaryData' folder.")
-        constant_path = os.path.join(cwd, "constant")
-        if not os.path.exists(constant_path):
-            raise RuntimeError("'constant' folder does not exist in the OpenFOAM case directory.")
-        self.boundary_data_path = os.path.join(cwd, "constant", "boundaryData")
-        if os.path.exists(self.boundary_data_path):
-            raise RuntimeError("'boundaryData' folder already exists.")
-
-        # Create boundaryData
-        os.mkdir(os.path.join(cwd, "constant", "boundaryData"))
-        os.mkdir(os.path.join(cwd, "constant", "boundaryData", inlet_name))
-        boundary_inlet_path = os.path.join(cwd, "constant", "boundaryData", inlet_name)
-        command = f"touch {boundary_inlet_path}/points"
-        subprocess.run(command, shell=True)
-
-        # Write 'points'-file
-        points_out_path = os.path.join(boundary_inlet_path, "points")
-        n_faces = len(face_list[:, 0])
-        with open(points_out_path, 'a+') as f:
-            f.write(str(n_faces)+'\n')
-            f.write('('+'\n')
-            for fid in range(n_faces):
-                f.write('(' + str(face_list[fid, 1]) + ' ' + str(face_list[fid, 2]) + ' ' + str(face_list[fid, 3]) + ') \n')
-            f.write(')'+'\n')
-
     def _write_boundary_data(self):
         # attributes
         time_step = self.time_step
-        boundary_inlet_path = os.path.join(self.boundary_data_path, "inlet")
+        boundary_data_path = self.boundary_data_path
+        boundary_inlet_path = os.path.join(boundary_data_path, "inlet")
         alpha_name = self.alpha_name
         n_faces = len(self.inlet_faces[:, 0])
         velocity = self.velocity
@@ -135,13 +113,16 @@ class Writer():
 
         # Write velocity and volume fraction for water at each time step.
         self.logger.info("Writing boundary condition to folder 'boundaryData'.")
-        args = [time_step, boundary_inlet_path, alpha_name, n_faces, velocity, alpha, time]
+        args = [boundary_inlet_path, alpha_name, n_faces, velocity, alpha, time]
+
+        # with partial
         partial_write = partial(self.__write_time_step, args=args)
         n_workers = max(8, os.cpu_count())
         self.logger.info(f"Using {n_workers} threads for writing routine.")
         time_steps = [tid for tid in range(len(time))]
         with ThreadPoolExecutor(max_workers=n_workers) as executor:
             executor.map(partial_write, time_steps)
+
         self.logger.info("Boundary condition was successfully saved in 'boundaryData'.")
 
     # === Private functions ===
@@ -171,16 +152,14 @@ class Writer():
 
     def __write_time_step(self, tid, args):
         # arguments
-        time_step = args[0]
-        boundary_inlet_path = args[1]
-        alpha_name = args[2]
-        n_faces = args[3]
-        velocity = args[4]
-        alpha = args[5]
-
-        time = args[6]
+        boundary_inlet_path = args[0]
+        alpha_name = args[1]
+        n_faces = args[2]
+        velocity = args[3]
+        alpha = args[4]
+        time = args[5]
         time_i = time[tid]
-        trunc_time_i = truncate(time_i, time_step)
+        trunc_time_i = f"{time_i:g}"
 
         # Set location of files
         U_out_path = f"{boundary_inlet_path}/{trunc_time_i}/U"
