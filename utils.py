@@ -1,5 +1,6 @@
 # system modules
 import sys, os, shutil
+import subprocess
 from pathlib import Path
 from contextlib import redirect_stdout
 import multiprocessing
@@ -19,13 +20,15 @@ import pandas as pd
 
 # plotting modules
 import matplotlib.pyplot as plt
-import scienceplots
-import subprocess
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 
 # profiling
+import time
 import tracemalloc
 from contextlib import contextmanager
+
+# misc
+from dataclasses import dataclass
 
 # matplotlib settings
 # plt.style.use('science')
@@ -134,36 +137,3 @@ def get_openfoam_type(cfd_version: str) -> str:
 
     raise ValueError("The cfd_version variable is unknown for OpenFOAM. \
                      Use the format [v2312-foss-2023a] for com or [11-foss-2023a] for org version")
-
-one_kibibyte = 1 << 10
-one_mebibyte = 1 << 20
-one_gibibyte = 1 << 30
-mem_unit_size = one_mebibyte
-@contextmanager
-def memory_profiler(logger, func_name: str, activate: bool):
-    if activate:
-        tracemalloc.start()
-
-        yield
-
-        current, peak = tracemalloc.get_traced_memory()
-        tracemalloc.stop()
-
-        # choose memory unit for printing
-        if is_inside(peak, min=one_gibibyte, max=100*one_gibibyte):
-            mem_unit = "GiB"
-            mem_unit_size = one_gibibyte
-        elif is_inside(peak, min=one_mebibyte, max=one_gibibyte):
-            mem_unit = "MiB"
-            mem_unit_size = one_mebibyte
-        elif is_inside(peak, min=0, max=one_mebibyte):
-            mem_unit = "KiB"
-            mem_unit_size = one_kibibyte
-        else:
-            mem_unit = "GiB"
-            mem_unit_size = one_gibibyte
-
-        logger.info(f"{func_name} memory allocation in [{mem_unit}]")
-        logger.info(f"\t Peak = {peak / mem_unit_size:,.3f}; Final = {current / mem_unit_size:,.3f}")
-    else:
-        yield
