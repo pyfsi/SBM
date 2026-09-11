@@ -28,7 +28,9 @@ class Model():
         self._set_seed()
 
         # reference to data storage
-        self.data = data
+        self.inlet_data = data
+        self.inlet_data.faces = self.inlet_data.faces
+        self.inlet_normal = self.inlet_data.normal
 
         # logger
         self.logger = logger
@@ -43,26 +45,28 @@ class Model():
 
         self.alpha = np.ones([self.n_faces, self.n_timesteps, 1], dtype=np.float64)
         self.velocity = np.ones([self.n_faces, self.n_timesteps, 3], dtype=np.float64)
-        self.velocity[:,:,:] = self.velocity_bc * self.data["inlet_normal"][None, None, :]
+        self.velocity[:,:,:] = self.velocity_bc * self.inlet_data.normal[None, None, :]
 
-    def initialize_buffer(self):
-        self.n_faces = len(self.data["inlet_faces"])
-
-        # buffer to pass alpha and velocity to next block iteration
-        self.buffer = np.ones([self.n_faces, self.buffer_size, 4], dtype=np.float64)
-        self.buffer[:,:,1:4] = self.velocity_bc * self.data["inlet_normal"][None, None, :]
-
-    def run(self, block_idx: int):
-        self._read_buffer()
-
+        # print log
         start_msg = f"Start bubble calculation for time interval {block_idx}"
         self.logger.info(start_msg)
         print(start_msg)
-        mass_inserted = self._insert_bubbles(block_idx)
+
+    def initialize_buffer(self):
+        self.n_faces = len(self.inlet_data.faces)
+
+        # buffer to pass alpha and velocity to next block iteration
+        self.buffer = np.ones([self.n_faces, self.buffer_size, 4], dtype=np.float64)
+        self.buffer[:,:,1:4] = self.velocity_bc * self.inlet_data.normal[None, None, :]
+
+    def run(self):
+        self._read_buffer()
+
+        mass_inserted = self._insert_bubbles()
         inserted_mass_msg = f"\t Mass of inserted gas: {mass_inserted} kg. (Target mass: {self.mg_per_block} kg)."
         self.logger.info(inserted_mass_msg)
 
-        self._pass_data()
+        self.inlet_data.store_block_data(self.alpha, self.velocity)
 
         self._store_buffer()
 
@@ -98,7 +102,7 @@ class Model():
 
         return face_idx, time_idx, mass_sample
 
-    def _define_bubble(self, face_idx, time_idx, mass_sample, block_idx):
+    def _define_bubble(self, face_idx, time_idx, mass_sample):
         '''
         Set volume of fluid fraction and velocity cells within a bubble to their prescribed values.
 
@@ -124,8 +128,8 @@ class Model():
         intersect_bubble = self.intersect_bubble
         # arrays
         time = self.time
-        face_list = self.data["inlet_faces"]
-        normal_inlet = self.data["inlet_normal"]
+        face_list = self.inlet_data.faces
+        normal_inlet = self.inlet_data.normal
 
         bubble_coord = face_list[face_idx, :] # ID - X - Y - Z - area
         bubble_time = time[time_idx]
@@ -151,9 +155,6 @@ class Model():
         max_rel_time_idx_in_radius = int(temp) + 1
 
         # convert from relative time idx
-        # min_time_idx_in_radius = self._convert_to_time_idx(block_idx, min_rel_time_idx_in_radius)
-        # max_time_idx_in_radius = self._convert_to_time_idx(block_idx, max_rel_time_idx_in_radius)
-        # time_idx_in_radius = np.arange(min_time_idx_in_radius, max_time_idx_in_radius)
         time_idx_in_radius = np.arange(min_rel_time_idx_in_radius, max_rel_time_idx_in_radius) # relative time idx
 
         # create 3d tensor to describe the relative cell positions w.r.t. velocity times time
@@ -193,12 +194,12 @@ class Model():
 
         return True, mass_bubble_cells
 
-    def _insert_bubbles(self, block_idx: int) -> float:
+    def _insert_bubbles(self) -> float:
         '''
         Iteratively insert bubble to the block until target mass has been reached.
 
         Args:
-            block_idx: index for insertion block
+            -
 
         Returns:
             mass_inserted: total mass of cells enclosed by defined bubbles.
@@ -206,14 +207,14 @@ class Model():
         # aliases
         mass_per_block = self.mg_per_block
         mg_tol = self.mg_tol
-        face_list = self.data["inlet_faces"]
+        face_list = self.inlet_data.faces
         mass_lower_bound = self.mg_min
         mass_upper_bound = self.mg_max
 
         # calc time indices
         timesteps_per_block = self.timesteps_per_block
-        min_timeidx = 0 #self._convert_to_time_idx(block_idx, 0)
-        max_timeidx = timesteps_per_block - 1 #self._convert_to_time_idx(block_idx, timesteps_per_block - 1)
+        min_timeidx = 0
+        max_timeidx = timesteps_per_block - 1
 
         iter = 0
         mass_inserted = 0.0
@@ -228,7 +229,7 @@ class Model():
             ]
 
             face_idx, time_idx, mass_sample = self._sample_random(face_idx_bounds, time_idx_bounds, mass_bounds)
-            is_bubble_defined, mass_bubble_cells = self._define_bubble(face_idx, time_idx, mass_sample, block_idx)
+            is_bubble_defined, mass_bubble_cells = self._define_bubble(face_idx, time_idx, mass_sample)
 
             # if self.plotter:
             #     self.plotter.update_sample_distribution(mass_sample)
@@ -253,12 +254,6 @@ class Model():
                 raise RuntimeError("inlet_modelling took longer than 1000 iterations.")
 
         return mass_inserted
-
-    def _pass_data(self):
-        # self.data["time"] = self.time
-        abs_time_idx = self.abs_time_idx
-        self.data["alpha"][:, abs_time_idx, :] = self.alpha
-        self.data["velocity"][:, abs_time_idx, :] = self.velocity
 
     # === conversion ===
     def _convert_to_time_idx(self, block_idx: int, rel_time_idx):
@@ -312,8 +307,8 @@ class Model():
         # get cell coordinates in x,y,z space
         n_timesteps = self.n_timesteps
         n_faces = self.n_faces
-        face_list_extended = np.array([self.data["inlet_faces"][:, 1:4]] * n_timesteps)
-        time_velocity_product = np.tensordot(self.time[:], self.velocity_bc * self.data["inlet_normal"][:], axes=0)
+        face_list_extended = np.array([self.inlet_data.faces[:, 1:4]] * n_timesteps)
+        time_velocity_product = np.tensordot(self.time[:], self.velocity_bc * self.inlet_data.normal[:], axes=0)
         cell_coords = face_list_extended[:, :, :] - time_velocity_product[:, None, : ]
         cell_coords = np.swapaxes(cell_coords, 0, 1)
         cell_coords = np.reshape(cell_coords, (n_timesteps * n_faces, -1), order='C')

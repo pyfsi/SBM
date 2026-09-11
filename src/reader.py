@@ -22,11 +22,10 @@ class Reader():
             self.inlet_cell_data_names = ["Cx", "Cy", "Cz", "area"]
 
         # reference to data storage
-        self.data = data
+        self.inlet_data = data
 
         # logger
         self.logger = logger
-
 
     def initialize(self):
         '''initialize data storage for inlet geometry'''
@@ -45,11 +44,11 @@ class Reader():
         else:
             raise RuntimeError(f"Number of dimensions {self.dimension} is invalid. It must either be 2 or 3.")
 
-        self._pass_data()
-        self._save_inlet_faces()
+        # store in dataclass
+        self.inlet_data.store_geometry(self.inlet_faces, self.inlet_normal)
 
-    def get_data(self):
-        return self.inlet_faces, self.inlet_normal
+        # save inlet faces as npy
+        self._save_inlet_faces()
 
     # ===== Protected functions =====
     def _run_openfoam_postprocess(self):
@@ -189,10 +188,6 @@ class Reader():
         normal_inlet = (1/np.linalg.norm(normal_inlet))*normal_inlet
 
         self.inlet_normal = normal_inlet
-
-    def _pass_data(self):
-        self.data["inlet_faces"] = self.inlet_faces
-        self.data["inlet_normal"] = self.inlet_normal
 
     def _save_inlet_faces(self):
         # Save inlet and normal in Python Numpy-array format

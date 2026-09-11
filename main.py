@@ -7,7 +7,6 @@ if __name__=="__main__":
     with open(config_path, "r") as conf_f:
         config = yaml.load(conf_f, Loader=yaml.SafeLoader)
 
-    # SBM object
     sbm = SBM(config)
     sbm.check_case()
     sbm.purge_boundary_data()

@@ -1,5 +1,4 @@
-from utils import os, np, subprocess, shutil, partial, ThreadPoolExecutor
-from utils import truncate
+from utils import os, np, subprocess, partial, ThreadPoolExecutor
 
 class Writer():
     def __init__(self, config, data, logger):
@@ -19,7 +18,7 @@ class Writer():
         self.buffer_size = int(config.get("_buffer_size"))
 
         # reference to data storage
-        self.data = data
+        self.inlet_data = data
 
         # logger
         self.logger = logger
@@ -27,13 +26,13 @@ class Writer():
     def initialize(self, block_idx):
         # absolute time index and time array
         abs_time_idx_block_start = self.timesteps_per_block * block_idx
-        abs_time_idx_block_end = self.timesteps_per_block * (block_idx+1) #TODO+ self.buffer_size
-        self.abs_time_idx = np.arange(abs_time_idx_block_start, abs_time_idx_block_end, 1)
-        self.time = self.abs_time_idx * self.time_step + self.time_start
+        abs_time_idx_block_end = self.timesteps_per_block * (block_idx+1)
+        abs_time_idx = np.arange(abs_time_idx_block_start, abs_time_idx_block_end, 1)
+        self.time = abs_time_idx * self.time_step + self.time_start
 
-        self.inlet_faces = self.data["inlet_faces"][:,:]
-        self.alpha = self.data["alpha"][:,self.abs_time_idx,:]
-        self.velocity = self.data["velocity"][:,self.abs_time_idx,:]
+        self.inlet_faces = self.inlet_data.faces[:,:]
+        self.alpha = self.inlet_data.alpha[:,:,:]
+        self.velocity = self.inlet_data.velocity[:,:,:]
 
     def run(self):
         self._write_boundary_data()
