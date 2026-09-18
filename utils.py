@@ -61,8 +61,49 @@ def truncate(val: float, stepsize: float) -> float:
 def modulo(a: float, b: float) -> float:
     '''
     Calculate the remainder from dividing a with b.
+    Args:
+        a: dividend
+        b: divisor
+
+    Returns:
+        The remainder
+
+    Raises:
+        ValueError: If one of the arguments can not be converted to float.
     '''
-    return a - int(a/b) * b
+    try:
+        _a_div_b = (a/b)
+    except ZeroDivisionError:
+        raise ZeroDivisionError("Second argument b can not be zero.")
+    except TypeError:
+        raise TypeError("Division can not be applied to given arguments.")
+    except:
+        raise RuntimeError("Something went wrong during division of a with b.")
+
+    return a - int(_a_div_b) * b
+
+def is_inside(val, min, max) -> bool:
+    '''
+    Checks if a value is bounded by min and max.
+    Args:
+        val: value to be checked
+        min: lower bound
+        max: upper bound
+
+    Returns:
+        Returns True if val is larger than min and lower than max
+
+    Raises:
+        ValueError: If one of the arguments can not be converted to float.
+    '''
+    try:
+        _min = float(min)
+        _val = float(val)
+        _max = float(max)
+    except:
+        raise ValueError("One of the given arguments cannot be converted to float.")
+
+    return (_min < _val) & (_val < _max)
 
 def get_openfoam_type(cfd_version: str) -> str:
     """
@@ -93,36 +134,35 @@ def get_openfoam_type(cfd_version: str) -> str:
     raise ValueError("The cfd_version variable is unknown for OpenFOAM. \
                      Use the format [v2312-foss-2023a] for com or [11-foss-2023a] for org version")
 
-
-def is_inside(val: float, min: float, max: float) -> bool:
-    return (min < val) & (val < max)
-
 one_kibibyte = 1 << 10
 one_mebibyte = 1 << 20
 one_gibibyte = 1 << 30
 mem_unit_size = one_mebibyte
 @contextmanager
-def memory_profile(logger, func_name: str):
-    tracemalloc.start()
+def memory_profiler(logger, func_name: str, activate: bool):
+    if activate:
+        tracemalloc.start()
 
-    yield
+        yield
 
-    current, peak = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
+        current, peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
 
-    # choose memory unit for printing
-    if is_inside(peak, min=one_gibibyte, max=100*one_gibibyte):
-        mem_unit = "GiB"
-        mem_unit_size = one_gibibyte
-    elif is_inside(peak, min=one_mebibyte, max=one_gibibyte):
-        mem_unit = "MiB"
-        mem_unit_size = one_mebibyte
-    elif is_inside(peak, min=0, max=one_mebibyte):
-        mem_unit = "KiB"
-        mem_unit_size = one_kibibyte
+        # choose memory unit for printing
+        if is_inside(peak, min=one_gibibyte, max=100*one_gibibyte):
+            mem_unit = "GiB"
+            mem_unit_size = one_gibibyte
+        elif is_inside(peak, min=one_mebibyte, max=one_gibibyte):
+            mem_unit = "MiB"
+            mem_unit_size = one_mebibyte
+        elif is_inside(peak, min=0, max=one_mebibyte):
+            mem_unit = "KiB"
+            mem_unit_size = one_kibibyte
+        else:
+            mem_unit = "GiB"
+            mem_unit_size = one_gibibyte
+
+        logger.info(f"{func_name} memory allocation in [{mem_unit}]")
+        logger.info(f"\t Peak = {peak / mem_unit_size:,.3f}; Final = {current / mem_unit_size:,.3f}")
     else:
-        mem_unit = "GiB"
-        mem_unit_size = one_gibibyte
-
-    logger.info(f"{func_name} memory allocation in [{mem_unit}]")
-    logger.info(f"\t Peak = {peak / mem_unit_size:,.3f}; Final = {current / mem_unit_size:,.3f}")
+        yield

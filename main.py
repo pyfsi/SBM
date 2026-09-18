@@ -5,11 +5,27 @@
 # The values for the boundary condition are then written by running the third script ("write_bc_<solver>.py")
 
 from utils import os, yaml, shutil, logging
-from utils import get_openfoam_type, memory_profile, modulo
+from utils import get_openfoam_type, memory_profiler, modulo
 from utils import SBM_OUTPUT
 import cProfile
 
 logger = logging.getLogger(__name__)
+
+def check_config_file(config):
+    t_start = float(config["cfd"]["start_time"])
+    t_end = float(config["cfd"]["end_time"])
+    timestep_size = float(config["cfd"]["delta_time"])
+    block_size = float(config["sbm"]["t_unit"])
+
+    # check time settings
+    if t_end <= t_start:
+        raise ValueError("t_end should be larger than t_start.")
+    if timestep_size<0.0:
+        raise ValueError("The timestep size can not be less than zero.")
+    if modulo((t_end-t_start), block_size) > 1e-12:
+        raise ValueError("Insertion interval (t_end - t_start) should be a multiple of t_unit.")
+    if modulo(block_size, timestep_size) > 1e-12:
+        raise ValueError("Variable t_unit should be a multiple of time_step.")
 
 def main(config):
     # define config variables
@@ -50,7 +66,7 @@ def main(config):
 
     # Read CFD inlet data
     logger.info("========================Start read_inlet========================")
-    with memory_profile(logger, func_name="read_inlet"):
+    with memory_profiler(logger, func_name="read_inlet", activate=True):
         if cfd_program.lower() == "openfoam":
             from src.read_inlet_openfoam import read_inlet_openfoam
             read_inlet_openfoam(config)
@@ -64,13 +80,13 @@ def main(config):
     # model inlet boundary conditions
     logger.info("========================Start inlet_modelling========================")
     from src.inlet_modelling import inlet_modelling
-    with memory_profile(logger, func_name="inlet_modelling"):
+    with memory_profiler(logger, func_name="inlet_modelling", activate=True):
         inlet_modelling(config)
     logger.info("========================End inlet_modelling========================")
 
     # Write output
     logger.info("========================Start write_bc========================")
-    with memory_profile(logger, func_name="write_bc"):
+    with memory_profiler(logger, func_name="write_bc", activate=True):
         if cfd_program.lower() == "openfoam":
             from src.write_bc_openfoam import write_bc_openfoam
             write_bc_openfoam(config)
@@ -90,17 +106,7 @@ if __name__=='__main__':
         config = yaml.load(conf_f, Loader=yaml.SafeLoader)
     profile_run = config.get("profile_run", False)
 
-    # config correctness check
-    t_start = float(config["cfd"]["start_time"])
-    t_end = float(config["cfd"]["end_time"])
-    timestep_size = float(config["cfd"]["delta_time"])
-    block_size = float(config["sbm"]["t_unit"])
-    if t_end <= t_start:
-        raise RuntimeError("t_end should be larger than t_start.")
-    if modulo((t_end-t_start), block_size) > 1e-12:
-        raise RuntimeError("Insertion interval (t_end - t_start) should be a multiple of t_unit.")
-    if modulo(block_size, timestep_size) > 1e-12:
-        raise RuntimeError("Variable t_unit should be a multiple of time_step.")
+    check_config_file(config)
 
     if profile_run:
         prof_name = "sbm.prof"
