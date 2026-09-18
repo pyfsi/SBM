@@ -1,4 +1,4 @@
-from utils import os, np, subprocess, partial, ThreadPoolExecutor
+from utils import os, np, pd, subprocess, partial, ThreadPoolExecutor
 
 class Writer():
     def __init__(self, config, data, logger):
@@ -9,6 +9,7 @@ class Writer():
         self.inlet_name = str(config["cfd"]["inlet_name"])
         self.alpha_name = "alpha."+config["cfd"]["alpha_name"]
         self.velocity_bc = float(config["model"]["velocity"])
+        self.save_csv = bool(config["settings"].get("save_csv", False))
 
         # paths
         self.cwd = os.getcwd()
@@ -39,7 +40,9 @@ class Writer():
 
     def run(self):
         self._write_boundary_data()
-        self._save_csv()
+
+        if self.save_csv:
+            self._save_csv()
 
     def check(self):
         '''Check boundary condition definition.'''

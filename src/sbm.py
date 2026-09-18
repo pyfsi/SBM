@@ -1,5 +1,6 @@
 from utils import os, shutil, re, np
 from utils import modulo
+from utils import PI
 
 # SBM components
 from .logger import Logger
@@ -20,6 +21,8 @@ class SBM():
         self.time_block = float(config["model"]["time"]["block"])
         self.velocity_bc = float(config["model"]["velocity"])
         self.inlet_name = str(config["cfd"]["inlet_name"])
+        self.density_gas = float(config["cfd"]["rho_g"])
+        self.mg_max = float(config["model"]["mass_g"]["max"])
         self.cwd = os.getcwd()
 
     def check_case(self):
@@ -206,10 +209,17 @@ class SBM():
     def _add_time_config(self):
         time_step = self.time_step
         time_block = self.time_block
+        mg_max = self.mg_max
+        density_gas = self.density_gas
+        velocity_bc = self.velocity_bc
+
+        # calculate bufer size based on radius
+        radius_bubble = ((3.0*mg_max)/(4.0*PI*density_gas))**(1.0/3.0)
+        buffer_size = int((radius_bubble/velocity_bc)/time_step)
 
         timesteps_per_block = int(time_block/time_step)
         self.config["_timesteps_per_block"] = timesteps_per_block
-        buffer_size = int(timesteps_per_block*0.5) # TODO make radius dependent ?
+        buffer_size = int(timesteps_per_block + buffer_size)
         self.config["_buffer_size"] = buffer_size
 
     # === check functions ===
