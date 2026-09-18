@@ -8,6 +8,7 @@ class Writer():
         self.time_step = float(config["model"]["time"]["step"])
         self.inlet_name = str(config["cfd"]["inlet_name"])
         self.alpha_name = "alpha."+config["cfd"]["alpha_name"]
+        self.velocity_bc = float(config["model"]["velocity"])
 
         # paths
         self.cwd = os.getcwd()
@@ -29,13 +30,16 @@ class Writer():
         abs_time_idx_block_end = self.timesteps_per_block * (block_idx+1)
         abs_time_idx = np.arange(abs_time_idx_block_start, abs_time_idx_block_end, 1)
         self.time = abs_time_idx * self.time_step + self.time_start
+        self.block_idx = block_idx
 
         self.inlet_faces = self.inlet_data.faces[:,:]
+        self.inlet_normal = self.inlet_data.normal[:]
         self.alpha = self.inlet_data.alpha[:,:,:]
         self.velocity = self.inlet_data.velocity[:,:,:]
 
     def run(self):
         self._write_boundary_data()
+        self._save_csv()
 
     def check(self):
         '''Check boundary condition definition.'''
@@ -123,6 +127,32 @@ class Writer():
             executor.map(partial_write, time_steps)
 
         self.logger.info("Boundary condition was successfully saved in 'boundaryData'.")
+
+    def _save_csv(self):
+        # number of face and timesteps
+        n_faces = len(self.inlet_faces)
+        n_timesteps = len(self.time)
+
+        # print csv to visualize pre-inlet domain
+        self.logger.info("Saving inlet profile to csv-files.")
+        csv_name = f"inlet_data_block{self.block_idx}.csv"
+        csv_file_path = os.path.join(self.output_path, csv_name)
+        inlet_all_variable = np.concatenate((self.alpha[:,:n_timesteps,:], self.velocity[:,:n_timesteps,:]), axis=2)
+        csv_header = "x_coord,y_coord,z_coord,alpha,velocity_x,velocity_y,velocity_z"
+
+        # get cell coordinates in x,y,z space
+        face_list_extended = np.array([self.inlet_faces[:, 1:4]] * n_timesteps)
+        time_velocity_product = np.tensordot(self.time[:], self.velocity_bc * self.inlet_normal[:], axes=0)
+        cell_coords = face_list_extended[:, :, :] - time_velocity_product[:, None, : ]
+        cell_coords = np.swapaxes(cell_coords, 0, 1)
+        cell_coords = np.reshape(cell_coords, (n_timesteps * n_faces, -1), order='C')
+
+        # save csv
+        inlet_var_reshaped = np.reshape(inlet_all_variable, (n_timesteps * n_faces, -1), order="C")
+        inlet_ds = np.concatenate((cell_coords, inlet_var_reshaped), axis=1)
+        np.savetxt(csv_file_path, inlet_ds, fmt='%.6e',
+                    header=csv_header, delimiter=",", comments='')
+        self.logger.info("Inlet profile saved to csv-files.")
 
     # === Private functions ===
     def __write_header(self, file_loc: str, class_name: str, object_name: str):

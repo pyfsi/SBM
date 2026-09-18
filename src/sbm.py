@@ -84,9 +84,6 @@ class SBM():
         # main SBM iteration
         self._iterate()
 
-        # save
-        # self._save_csv()
-
     def finalize(self):
         # attributes
         cwd = self.cwd
@@ -205,29 +202,6 @@ class SBM():
             with self.logger.function_call(name="writer"):
                 self.writer.initialize(block_idx)
                 self.writer.run()
-
-    def _save_csv(self):
-        # print csv to visualize pre-inlet domain
-        self.logger.info("Saving inlet profile to csv-files.")
-        csv_file_path = os.path.join(self.config["_output_path"], "inlet_data.csv")
-        inlet_all_variable = np.concatenate((self.inlet_data.alpha[:,:,:], self.inlet_data.velocity[:,:,:]), axis=2)
-        csv_header = "x_coord,y_coord,z_coord,alpha,velocity_x,velocity_y,velocity_z"
-
-        # get cell coordinates in x,y,z space
-        n_faces = len(self.inlet_data.faces)
-        n_timesteps = len(self.inlet_data.time)
-        face_list_extended = np.array([self.inlet_data.faces[:, 1:4]] * n_timesteps)
-        time_velocity_product = np.tensordot(self.inlet_data.time[:], self.velocity_bc * self.inlet_data.normal[:], axes=0)
-        cell_coords = face_list_extended[:, :, :] - time_velocity_product[:, None, : ]
-        cell_coords = np.swapaxes(cell_coords, 0, 1)
-        cell_coords = np.reshape(cell_coords, (n_timesteps * n_faces, -1), order='C')
-
-        # save csv
-        inlet_var_reshaped = np.reshape(inlet_all_variable, (n_timesteps * n_faces, -1), order="C")
-        inlet_ds = np.concatenate((cell_coords, inlet_var_reshaped), axis=1)
-        np.savetxt(csv_file_path, inlet_ds, fmt='%.6e',
-                    header=csv_header, delimiter=",", comments='')
-        self.logger.info("Inlet profile saved to csv-files.")
 
     def _add_time_config(self):
         time_step = self.time_step
