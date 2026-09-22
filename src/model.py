@@ -1,5 +1,6 @@
-from utils import np, random, os
+from utils import np, os
 from utils import PI
+from .generator import Generator
 
 class Model():
     MAX_INSERT_ITER = 1000
@@ -24,13 +25,13 @@ class Model():
         self.timesteps_per_block = int(config.get("_timesteps_per_block"))
         self.buffer_size = int(config.get("_buffer_size"))
 
-        # set seed
-        self._set_seed()
-
         # reference to data storage
         self.inlet_data = data
         self.inlet_data.faces = self.inlet_data.faces
         self.inlet_normal = self.inlet_data.normal
+
+        # init generator for bubble definition
+        self.generator = Generator(config,)
 
         # logger
         self.logger = logger
@@ -71,45 +72,13 @@ class Model():
         self._store_buffer()
 
     # ===== Protected functions =====
-    def _set_seed(self):
-        # set seed for random number generator
-        seed = self.seed
-        if seed.lower()=="none":
-            seed = None
-        seed_msg = f"Using seed {seed} for random number generator"
-        print(seed_msg)
-        random.seed(seed)
 
-    def _sample_random(self, fid_bounds: list, tid_bounds: list, mass_bounds:list):
-        '''
-        Sample bubble parameters from predefined statistical distributions.
-        Args:
-            fid_bounds: lower and upper bounds for face index
-            tid_bounds: lower and upper bounds for time index
-            mass_bounds: lower and upper bounds for mass of one bubble
-
-        Returns:
-            Returns face_idx, time_idx, mass
-        '''
-        # sample cell index for spatial coordinates
-        face_idx = random.randint(fid_bounds[0], fid_bounds[1])
-
-        # sample time index for temporal coordinates
-        time_idx = random.randint(tid_bounds[0], tid_bounds[1])
-
-        # sample bubble mass
-        mass_sample = random.uniform(mass_bounds[0], mass_bounds[1])
-
-        return face_idx, time_idx, mass_sample
-
-    def _define_bubble(self, face_idx, time_idx, mass_sample):
+    def _define_bubble(self, sample):
         '''
         Set volume of fluid fraction and velocity cells within a bubble to their prescribed values.
 
         Args:
-            face_idx: index for inlet faces array
-            time_idx: index for time array
-            mass_sample: mass of one bubble
+            sample:
             block_idx: index for insertion block
 
         Returns:
@@ -130,6 +99,11 @@ class Model():
         time = self.time
         face_list = self.inlet_data.faces
         normal_inlet = self.inlet_data.normal
+
+        # sample
+        face_idx = sample["face"]
+        time_idx = sample["time"]
+        mass_sample = sample["mass"]
 
         bubble_coord = face_list[face_idx, :] # ID - X - Y - Z - area
         bubble_time = time[time_idx]
@@ -228,8 +202,8 @@ class Model():
                 min((mass_upper_bound, mass_per_block - mass_inserted))
             ]
 
-            face_idx, time_idx, mass_sample = self._sample_random(face_idx_bounds, time_idx_bounds, mass_bounds)
-            is_bubble_defined, mass_bubble_cells = self._define_bubble(face_idx, time_idx, mass_sample)
+            sample = self.generator.sample_random(face_idx_bounds, time_idx_bounds, mass_bounds)
+            is_bubble_defined, mass_bubble_cells = self._define_bubble(sample)
 
             # if self.plotter:
             #     self.plotter.update_sample_distribution(mass_sample)
@@ -246,7 +220,10 @@ class Model():
                 #     self.plotter.plot_bubble_insertion()
 
                 # log face_idx, time_idx, and bubble mass
-                self.logger.info(f"\t\t inserted at face_idx={face_idx}, time_idx={time_idx}, m_b={mass_sample}")
+                self.logger.info(f"\t\t inserted at \
+                                 face_idx={sample["face"]}, \
+                                 time_idx={sample["time"]}, \
+                                 m_b={sample["mass"]}")
             else:
                 iter = iter+1
 
