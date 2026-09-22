@@ -1,6 +1,6 @@
 from utils import np, os
 from utils import PI
-from .generator import Generator
+from .sample_generator import SampleGenerator
 
 class Model():
     MAX_INSERT_ITER = 1000
@@ -31,7 +31,7 @@ class Model():
         self.inlet_normal = self.inlet_data.normal
 
         # init generator for bubble definition
-        self.generator = Generator(config,)
+        self.generator = SampleGenerator(config,)
 
         # logger
         self.logger = logger
