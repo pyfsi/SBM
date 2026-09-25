@@ -72,7 +72,6 @@ class Model():
         self._store_buffer()
 
     # ===== Protected functions =====
-
     def _define_bubble(self, sample):
         '''
         Set volume of fluid fraction and velocity cells within a bubble to their prescribed values.
@@ -84,6 +83,7 @@ class Model():
         Returns:
             is_bubble_defined: boolean describing validity of bubble
             mass_bubble_cells: mass of cells enclosed by the bubble
+            position_bubble: location of bubble center
         '''
 
         # alias
@@ -105,9 +105,17 @@ class Model():
         time_idx = sample["time"]
         mass_sample = sample["mass"]
 
+        # position calculation
         bubble_coord = face_list[face_idx, :] # ID - X - Y - Z - area
         bubble_time = time[time_idx]
-        bubble_center = bubble_coord[1:4] - (velocity_bc * bubble_time) * normal_inlet[:] # X - Y - Z
+        position_bubble = bubble_coord[1:4] - (velocity_bc * bubble_time) * normal_inlet[:]
+
+        # output variables
+        results = {
+            "is_defined": False,
+            "mass": mass_sample, # if is_defined=False: mass of sphere; else: mass of cells inside sphere
+            "position": position_bubble
+        }
 
         # calculate gas radius assuming spherical bubble
         radius_bubble = ((3.0*mass_sample)/(4.0*PI*density_gas))**(1.0/3.0)
@@ -117,9 +125,9 @@ class Model():
         intersect_with_start = bubble_time < (time_start+radius_bubble/velocity_bc)
         intersect_with_end = bubble_time > (time_end-radius_bubble/velocity_bc)
         if intersect_with_start:
-            return False, 0.0
+            return results
         if intersect_with_end:
-            return False, 0.0
+            return results
 
         # get face and time index (i and j) of bounding box
         is_inside_radius = np.linalg.norm(face_list[:, 1:4] - bubble_coord[1:4], axis=1) < radius_bubble
@@ -138,7 +146,7 @@ class Model():
         cell_coords = np.swapaxes(cell_coords, 0, 1) # [faces, timesteps, xyz]
 
         # get boolean field if cell is inside bubble
-        displacement = cell_coords[:,:,:]-bubble_center[None,None,:]
+        displacement = cell_coords[:,:,:]-position_bubble[None,None,:]
         distance_sqr = np.sum(displacement*displacement, axis=2)
         is_cell_inside_bubble = distance_sqr < radius_bubble * radius_bubble
         face_idx_in_bubble = face_idx_in_radius[is_cell_inside_bubble.nonzero()[0]]
@@ -148,7 +156,7 @@ class Model():
         alpha_inside_bubble = self.alpha[face_idx_in_bubble, time_idx_in_bubble, 0]
         if not intersect_bubble:
             if np.any(alpha_inside_bubble==0.0):
-                return False, 0.0
+                return results
 
         # calculate defined bubble mass
         avg_gas_mass_per_cell = np.average(face_list[:, 4]) * velocity_bc * time_step * density_gas
@@ -159,14 +167,18 @@ class Model():
         # and bubble is not allowed to intersect boundary
         if not intersect_boundary:
             if (mass_sample-bubble_mass_defined) > avg_gas_mass_per_cell:
-                return False, 0.0
+                return results
 
         # set alpha and velocity fields and defined gas mass
         self.alpha[face_idx_in_bubble, time_idx_in_bubble, 0] = 0.0
         self.velocity[face_idx_in_bubble, time_idx_in_bubble, :] = velocity_bc * normal_inlet[:]
         mass_bubble_cells = cell_area_inside_bubble * density_gas * velocity_bc * time_step
 
-        return True, mass_bubble_cells
+        # update function results
+        results["is_defined"] = True
+        results["mass"] = mass_bubble_cells
+
+        return results
 
     def _insert_bubbles(self) -> float:
         '''
@@ -200,30 +212,24 @@ class Model():
             mass_bounds = [
                 min((mass_lower_bound, mass_per_block - mass_inserted)),
                 min((mass_upper_bound, mass_per_block - mass_inserted))
-            ]
+            ] # TODO bounds only converted to radius => activated cells can have more mass
 
             sample = self.generator.sample_random(face_idx_bounds, time_idx_bounds, mass_bounds)
-            is_bubble_defined, mass_bubble_cells = self._define_bubble(sample)
+            results_definition = self._define_bubble(sample)
+            is_bubble_defined = results_definition["is_defined"]
+            mass_bubble = results_definition["mass"]
+            position_bubble = results_definition["position"]
 
-            # if self.plotter:
-            #     self.plotter.update_sample_distribution(mass_sample)
+            # store bubble data
+            self.inlet_data.store_bubble(mass_bubble, position_bubble, is_defined=is_bubble_defined)
 
             if is_bubble_defined:
-                mass_inserted += mass_bubble_cells
+                mass_inserted += mass_bubble
                 iter = 0
 
-                # # run plotter
-                # if self.plotter:
-                #     self.plotter.update_data(face_idx, time_idx)
-                #     self.plotter.update_distribution(mass_bubble_cells)
-                #     self.plotter.update_residual(mass_per_block, mass_inserted)
-                #     self.plotter.plot_bubble_insertion()
-
                 # log face_idx, time_idx, and bubble mass
-                self.logger.info(f"\t\t inserted at \
-                                 face_idx={sample["face"]}, \
-                                 time_idx={sample["time"]}, \
-                                 m_b={sample["mass"]}")
+                out_txt = f"\t\t inserted at face_idx={sample["face"]}, time_idx={sample["time"]}, m_b={sample["mass"]}"
+                self.logger.info(out_txt)
             else:
                 iter = iter+1
 

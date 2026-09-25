@@ -38,8 +38,10 @@ class SampleGenerator():
     def _convert_string_to_int(self, a):
         '''String to int conversion method for seed generation based on Python's random package'''
         if isinstance(a, str):
-            a = a.encode()
-        a = int.from_bytes(a + hashlib.sha512(a).digest(), 'big')
+            out = a.encode()
+        else:
+            out = a
+        return int.from_bytes(out + hashlib.sha512(out).digest(), 'big')
 
     def _initialize_rng(self):
         # set seed for random number generator
@@ -51,5 +53,5 @@ class SampleGenerator():
 
         # set random number generator
         if isinstance(seed, str):
-            seed = self._convert_string_to_int(seed)
-        self.rng = np.random.default_rng(seed=seed)
+            seed_converted = self._convert_string_to_int(seed)
+        self.rng = np.random.default_rng(seed=seed_converted)

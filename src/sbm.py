@@ -8,6 +8,7 @@ from .preprocessor import Preprocessor
 from .reader import Reader
 from .model import Model
 from .writer import Writer
+from .plotter import Plotter
 from .inlet_data import InletData
 
 class SBM():
@@ -67,7 +68,7 @@ class SBM():
         self.writer.check()
 
         # plotter
-        self.plotter = None
+        self.plotter = Plotter()
 
     def run(self):
         with self.logger.function_call(name="preprocessor"):
@@ -79,13 +80,17 @@ class SBM():
             self.reader.run()
 
         # initialize inlet data storage
-        self.inlet_data.initialize_block_data(self.config)
+        self.inlet_data.initialize(self.config)
+        self.inlet_data.calc_geometry_vars()
 
         # prepare directory for boundary condition
         self._prepare_boundary_data_dir()
 
         # main SBM iteration
         self._iterate()
+
+        # save plot
+        self.plotter.save_plot()
 
     def finalize(self):
         # attributes
@@ -191,8 +196,10 @@ class SBM():
         time_block = self.time_block
         n_blocks = int((time_end-time_start)/time_block)
 
-        # initialize model buffers
+        # singular intialization routines
         self.model.initialize_buffer()
+        inlet_data = self.inlet_data
+        self.plotter.initialize(self.config, inlet_data)
 
         self.logger.info(f"Discretized {n_blocks} intervals of {time_block} s between time_start {time_start} s and time_end {time_end} s.")
         for block_idx in range(n_blocks):
@@ -205,6 +212,14 @@ class SBM():
             with self.logger.function_call(name="writer"):
                 self.writer.initialize(block_idx)
                 self.writer.run()
+
+            # plotter
+            with self.logger.function_call(name="plotter"):
+                samples, rejected_samples = self.inlet_data.get_samples()
+                self.plotter.plot(samples, rejected_samples)
+
+            # inlet data cleanup
+            self.inlet_data.clean_samples()
 
     def _add_time_config(self):
         time_step = self.time_step
