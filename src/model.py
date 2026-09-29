@@ -21,14 +21,15 @@ class Model():
         self.intersect_bubble = config["model"]["intersect_bubble"]
         self.seed = str(config["model"].get("seed", None))
 
+        # sampling config
+        self.use_discrete_sampling = bool(config["model"]["sampling"].get("discrete", False))
+
         self.output_path = str(config.get("_output_path"))
         self.timesteps_per_block = int(config.get("_timesteps_per_block"))
         self.buffer_size = int(config.get("_buffer_size"))
 
         # reference to data storage
         self.inlet_data = data
-        self.inlet_data.faces = self.inlet_data.faces
-        self.inlet_normal = self.inlet_data.normal
 
         # init generator for bubble definition
         self.generator = SampleGenerator(config,)
@@ -72,13 +73,13 @@ class Model():
         self._store_buffer()
 
     # ===== Protected functions =====
-    def _define_bubble(self, sample):
+    def _define_bubble(self, sample, discrete=True):
         '''
         Set volume of fluid fraction and velocity cells within a bubble to their prescribed values.
 
         Args:
-            sample:
-            block_idx: index for insertion block
+            sample: sample variables
+            discrete: flag to denote discrete or continuous sampling space
 
         Returns:
             is_bubble_defined: boolean describing validity of bubble
@@ -100,15 +101,20 @@ class Model():
         face_list = self.inlet_data.faces
         normal_inlet = self.inlet_data.normal
 
-        # sample
-        face_idx = sample["face"]
-        time_idx = sample["time"]
-        mass_sample = sample["mass"]
+        # set function variables
+        if discrete:
+            mass_sample = sample["mass"]
+            face_idx = sample["face"]
+            time_idx = sample["time"]
+            bubble_coord = face_list[face_idx, :][1:4]
+            bubble_time = time[time_idx]
+        else:
+            mass_sample = sample["mass"]
+            bubble_coord = sample["position"]
+            bubble_time = sample["time"]
 
-        # position calculation
-        bubble_coord = face_list[face_idx, :] # ID - X - Y - Z - area
-        bubble_time = time[time_idx]
-        position_bubble = bubble_coord[1:4] - (velocity_bc * bubble_time) * normal_inlet[:]
+        # calculate bubble position
+        position_bubble = bubble_coord - (velocity_bc * bubble_time) * normal_inlet[:]
 
         # output variables
         results = {
@@ -130,7 +136,7 @@ class Model():
             return results
 
         # get face and time index (i and j) of bounding box
-        is_inside_radius = np.linalg.norm(face_list[:, 1:4] - bubble_coord[1:4], axis=1) < radius_bubble
+        is_inside_radius = np.linalg.norm(face_list[:, 1:4] - bubble_coord, axis=1) < radius_bubble
         face_idx_in_radius = is_inside_radius.nonzero()[0]
         min_rel_time_idx_in_radius = int((rel_cell_time - radius_bubble/velocity_bc) / time_step)
         temp = (rel_cell_time + radius_bubble/velocity_bc) // time_step
@@ -212,10 +218,16 @@ class Model():
             mass_bounds = [
                 min((mass_lower_bound, mass_per_block - mass_inserted)),
                 min((mass_upper_bound, mass_per_block - mass_inserted))
-            ] # TODO bounds only converted to radius => activated cells can have more mass
+            ]
+            pos_bounds = [self.inlet_data.min, self.inlet_data.max]
+            time_bounds = [self.time_start, self.time_end]
 
-            sample = self.generator.sample_random(face_idx_bounds, time_idx_bounds, mass_bounds)
-            results_definition = self._define_bubble(sample)
+            discrete_flag = self.use_discrete_sampling
+            if discrete_flag:
+                sample = self.generator.sample_random_discrete(face_idx_bounds, time_idx_bounds, mass_bounds)
+            else:
+                sample = self.generator.sample_random(pos_bounds, time_bounds, mass_bounds)
+            results_definition = self._define_bubble(sample, discrete=discrete_flag)
             is_bubble_defined = results_definition["is_defined"]
             mass_bubble = results_definition["mass"]
             position_bubble = results_definition["position"]
@@ -223,18 +235,20 @@ class Model():
             # store bubble data
             self.inlet_data.store_bubble(mass_bubble, position_bubble, is_defined=is_bubble_defined)
 
+            out_txt = f"\t [FAIL] inserted at position={position_bubble} and mass={mass_bubble}"
+            self.logger.info(out_txt)
+
             if is_bubble_defined:
                 mass_inserted += mass_bubble
                 iter = 0
 
-                # log face_idx, time_idx, and bubble mass
-                out_txt = f"\t\t inserted at face_idx={sample["face"]}, time_idx={sample["time"]}, m_b={sample["mass"]}"
+                out_txt = f"\t\t inserted at position={position_bubble} and mass={mass_bubble}"
                 self.logger.info(out_txt)
             else:
                 iter = iter+1
 
             if iter > self.MAX_INSERT_ITER:
-                raise RuntimeError("inlet_modelling took longer than 1000 iterations.")
+                raise RuntimeError(f"inlet_modelling took longer than {self.MAX_INSERT_ITER} iterations.")
 
         return mass_inserted
 

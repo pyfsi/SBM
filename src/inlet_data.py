@@ -55,10 +55,10 @@ class InletData:
         rejected_samples_end = self._rejected_samples_moving_pointer[0]
         samples_clean, rejected_samples_clean = {}, {}
         for key in self.samples.keys():
-            samples_clean[key] = self.samples[key][:samples_end]
+            samples_clean[key] = np.array(self.samples[key][:samples_end])
 
         for key in self.rejected_samples.keys():
-            rejected_samples_clean[key] = self.rejected_samples[key][:rejected_samples_end]
+            rejected_samples_clean[key] = np.array(self.rejected_samples[key][:rejected_samples_end])
 
         return samples_clean, rejected_samples_clean
 

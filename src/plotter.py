@@ -24,9 +24,9 @@ class Plotter():
         self.mass_min = float(config["model"]["mass_g"]["min"])
         self.mass_max = float(config["model"]["mass_g"]["max"])
 
-        # position bounds, reduced to 1D using L2 norm
+        # radial position bounds
         self.pos_min = 0.0
-        self.pos_max = max(np.linalg.norm(inlet_data.min, ord=2), np.linalg.norm(inlet_data.max, ord=2))
+        self.pos_max = max(np.linalg.norm(inlet_data.min), np.linalg.norm(inlet_data.max))/2
 
         # inlet geometry
         self.inlet_center = inlet_data.center
@@ -52,34 +52,34 @@ class Plotter():
 
     def update(self, samples, rejected_samples):
         # ignore and count mass samples out of bounds
-        samples_pass = {"mass":[], "position":[]}
-        for m, x in zip(samples["mass"], samples["position"]):
-            if (m<self.mass_min) | (m>self.mass_max):
-                self.oob_samples += 1
-            else:
-                samples_pass["mass"].append(m)
-                proj_point = self._project_points(x)
-                samples_pass["position"].append(np.linalg.norm(proj_point))
+        is_within_bounds = (self.mass_min<samples["mass"]) * (samples["mass"]<self.mass_max)
+        is_true_idx = np.where(is_within_bounds)[0]
+        self.oob_samples += len(is_within_bounds) - np.sum(is_within_bounds)
+        is_within_bounds_fail = (self.mass_min<rejected_samples["mass"]) * (rejected_samples["mass"]<self.mass_max)
+        is_true_idx_fail = np.where(is_within_bounds_fail)[0]
 
-        # process rejected samples
-        samples_fail = {"mass":[], "position":[]}
-        for m, x in zip(rejected_samples["mass"], rejected_samples["position"]):
-            samples_fail["mass"].append(m)
-            proj_point = self._project_points(x)
-            samples_fail["position"].append(np.linalg.norm(proj_point))
+        # collect samples within bounds for distribution plot
+        filtered_samples = {"mass":None, "position":None, "distance":None}
+        filtered_samples["mass"] = samples["mass"][is_true_idx]
+        filtered_samples["position"] = samples["position"][is_true_idx]
+        filtered_samples_rejected = {"mass":None, "position":None, "distance":None}
+        filtered_samples_rejected["mass"] = rejected_samples["mass"][is_true_idx_fail]
+        filtered_samples_rejected["position"] = rejected_samples["position"][is_true_idx_fail]
+
+        # calculate radial distance to inlet center
+        filtered_samples["distance"] = np.linalg.norm(self._project_points(filtered_samples["position"]), axis=1)
+        filtered_samples_rejected["distance"] = np.linalg.norm(self._project_points(filtered_samples_rejected["position"]), axis=1)
 
         # succcessful samples
-        pos_idx = np.digitize(samples_pass["position"], self.distribution["position"][0]) - 1
+        pos_idx = np.digitize(filtered_samples["distance"], self.distribution["position"][0]) - 1
         np.add.at(self.distribution["position"][1], pos_idx, 1)
-        mass_idx = np.digitize(samples_pass["mass"], self.distribution["mass"][0]) - 1
+        mass_idx = np.digitize(filtered_samples["mass"], self.distribution["mass"][0]) - 1
         np.add.at(self.distribution["mass"][1], mass_idx, 1)
 
         # rejected samples
-        pos_fail_idx = np.digitize(samples_fail["position"], self.distribution_rejected["position"][0]) - 1
-        id_min, id_max = 0, len(self.distribution_rejected["position"][1])
-        # pos_fail_idx = pos_fail_idx[(id_min<=pos_fail_idx)&(pos_fail_idx<id_max)]
+        pos_fail_idx = np.digitize(filtered_samples_rejected["distance"], self.distribution_rejected["position"][0]) - 1
         np.add.at(self.distribution_rejected["position"][1], pos_fail_idx, 1)
-        mass_fail_idx = np.digitize(samples_fail["mass"], self.distribution_rejected["mass"][0]) - 1
+        mass_fail_idx = np.digitize(filtered_samples_rejected["mass"], self.distribution_rejected["mass"][0]) - 1
         np.add.at(self.distribution_rejected["mass"][1], mass_fail_idx, 1)
 
     def draw(self):
@@ -161,5 +161,6 @@ class Plotter():
             vector from plane_center to the point's projection
         '''
         unit_plane_normal = self.inlet_normal / np.linalg.norm(self.inlet_normal)
-        relative_position = point - self.inlet_normal
-        return relative_position - np.dot(relative_position, unit_plane_normal) * unit_plane_normal
+        relative_position = point - self.inlet_center
+        length_relative_position_on_normal = np.dot(relative_position, unit_plane_normal)
+        return relative_position - length_relative_position_on_normal[:,None] * unit_plane_normal[None,:]
