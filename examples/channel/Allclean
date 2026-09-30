@@ -4,6 +4,7 @@ rm -rf postProcessing
 
 rm -rf processor*
 
+rm -rf 0/C*
 rm -rf 0.*
 rm -rf 1
 

@@ -1,0 +1,36 @@
+writeCellAreas1
+{
+	type coded;
+	libs ("libutilityFunctionObjects.so");
+	name writeCellAreas;
+
+	enabled true;
+	log true;
+	timeStart 0;
+	timeEnd 0;
+	executeControl writeTime;
+	executeInterval -1;
+	writeControl writeTime;
+	writeInterval -1;
+
+	codeExecute
+	#{
+		Info << "Execute writeFaceAreas" << endl;
+		surfaceScalarField faceAreas
+		(
+			IOobject
+			(
+				"area",
+				mesh().time().timeName(),
+				mesh(),
+				IOobject::NO_READ,
+				IOobject::NO_WRITE,
+				IOobject::NO_REGISTER
+			),
+			mesh().magSf()
+		);
+
+		Info << "	Writing cell face areas [area] to 0" << endl;
+		faceAreas.write();
+	#};
+}
