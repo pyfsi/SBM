@@ -1,6 +1,7 @@
 settings:
   purge_boundary_data: True    # Purges old boundary data directory
   activate_plotter:    False    # Activate SBM statistics plotter
+  save_csv: True                # save SBM results as csv files
 packages:
   cfd_program:  OpenFOAM                       # CFD program name e.g. OpenFOAM, ANSYS
   cfd_version:  v2312-foss-2023a               # CFD version based on module
