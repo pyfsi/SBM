@@ -1,0 +1,37 @@
+settings:
+  purge_boundary_data: True     # Purges old boundary data directory
+  activate_plotter:    False    # Activate SBM statistics plotter
+  save_csv: True                # Save SBM results as csv files
+packages:
+  cfd_program:  OpenFOAM                       # CFD program name e.g. OpenFOAM, ANSYS
+  cfd_version:  11-foss-2023a                  # CFD version based on module
+  python_version: Anaconda3-python/2023.09-0   # Python version
+cfd:
+  dimension:  3               # Number of dimension
+  inlet_name: inlet           # Case sensitive. Name of inlet boundary patch
+  alpha_name: Water           # Case sensitive. Corresponds to alpha.<alpha_name> defined in OpenFOAM case
+  rho_g:  1.225               # Density of gas
+  rho_l:  998.2               # Density of liquid
+model:
+  seed: 1                     # Seed for random. Set to None for pseudo-RNG. Type (int, float, str, bytes, and bytearray) possible as seed.
+  time:
+    start: 0                   # Start time for inlet model
+    end: 0.1                   # End time for inlet model
+    step: 1e-3                 # Timestep size
+    block: 0.01                # Size of insertion interval
+  mass_g:
+    per_block: 2.5e-7          # Target mass per insertion block
+    min:  2.5e-8               # min mass of single bubble to be inserted. Recommendation: 10% of target
+    max:  0.5e-7               # max mass of single bubble to be inserted. Recommendation: 20% of target
+    tol:  1e-8                 # Absolute tolerance on the gas mass with respect to the target
+  velocity: 1                  # Gas velocity
+  sampling:                    # define distribution functions in the range [0,1] that will be scaled based on their bounds
+    discrete: False            # whether to use discrete sampling
+    mass:                      # Type of distribution for mass sampling
+        type: uniform           # uniform, normal (default mu=0.5, sigma=1.0), or beta (default a=2.0, b=2.0)
+    time:                      # Type of distribution for time sampling
+        type: uniform
+    position:                  # Type of distribution for position sampling
+        type: uniform
+  intersect_boundary: False    # Allows bubbles to instersect domain boundary
+  intersect_bubble: False      # Allows bubbles to intersect each other
