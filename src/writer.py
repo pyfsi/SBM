@@ -68,13 +68,16 @@ class Writer():
         command = f"grep -nr 'setAverage' {time_start}/U | cut -d : -f 1 > lineNr_setAvg"
         subprocess.run(command, cwd=cwd, shell=True)
         lineNrsetAvg_path = os.path.join(cwd, "lineNr_setAvg")
-        lineNameNr = int(open(lineNrsetAvg_path, 'r').readline())-1  # Line where 'setAverage' is defined
-        readSetAvg = (open(U_path).readlines())[lineNameNr]
-        setAvg = (readSetAvg.split())[-1][0:-1]
-        os.remove(lineNrsetAvg_path)
-        if setAvg != "false":
-            raise RuntimeError(f"The boundary condition at '{inlet_name}' defines an averaging operation for 'U'. \
-                    This is not compatible with the transient inlet modelling defined in the Python script. \n")
+        try:
+            lineNameNr = int(open(lineNrsetAvg_path, 'r').readline())-1  # Line where 'setAverage' is defined
+            readSetAvg = (open(U_path).readlines())[lineNameNr]
+            setAvg = (readSetAvg.split())[-1][0:-1]
+            os.remove(lineNrsetAvg_path)
+            if setAvg != "false":
+                raise RuntimeError(f"The boundary condition at '{inlet_name}' defines an averaging operation for 'U'. \
+                        This is not compatible with the transient inlet modelling defined in the Python script. \n")
+        except:
+            os.remove(lineNrsetAvg_path)
 
         # Check boundary condition for alpha
         command = f"grep -nrw {inlet_name} {time_start}/{alpha_name} | cut -d : -f 1 > lineNr_VOFw"
@@ -92,7 +95,6 @@ class Writer():
         command = f"grep -nr 'setAverage' {time_start}/{alpha_name} | cut -d : -f 1 > lineNr_setAvg"
         subprocess.run(command, cwd=cwd, shell=True)
         lineNr_setAvg_path = os.path.join(cwd, "lineNr_setAvg")
-
         try:
             lineNameNr = int(lineNr_setAvg_path)-1 #Line where 'setAverage' is defined
             readSetAvg = (open(alpha_path).readlines())[lineNameNr]
@@ -158,30 +160,6 @@ class Writer():
         self.logger.info("Inlet profile saved to csv-files.")
 
     # === Private functions ===
-    def __write_header(self, file_loc: str, class_name: str, object_name: str):
-        with open(file_loc, 'w') as f:
-            f.write(r'/*--------------------------------*- C++ -*----------------------------------*\\'+"\n")
-            f.write(r'| =========                 |                                                 |'+"\n")
-            f.write(r'| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |'+"\n")
-            f.write(r'|  \\    /   O peration     | Version:  x                                   |'+"\n")
-            f.write(r'|   \\  /    A nd           | Web:      www.OpenFOAM.org                      |'+"\n")
-            f.write(r'|    \\/     M anipulation  |                                                 |'+"\n")
-            f.write(r'\*---------------------------------------------------------------------------*/'+"\n")
-            f.write(r'FoamFile'+"\n")
-            f.write(r'{'+"\n")
-            # f.write('\t version \t\t x;'+"\n")
-            f.write('\t format \t\t ascii;'+"\n")
-            f.write('\t class \t\t ' + class_name + ';'+"\n")
-            f.write('\t object \t\t ' + object_name + ';'+"\n");
-            f.write('}'+"\n")
-            f.write(r'// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //'+"\n")
-            f.write("\n")
-
-    def __write_footer(self, file_loc: str):
-        with open(file_loc, 'a+') as f:
-            f.write("\n")
-            f.write(r'// ************************************************************************* //' + "\n")
-
     def __write_time_step(self, tid, args):
         # arguments
         boundary_inlet_path = args[0]
@@ -205,10 +183,6 @@ class Writer():
         make_alpha_dir = f"touch {boundary_inlet_path}/{trunc_time_i}/{alpha_name};"
         subprocess.run(make_alpha_dir, shell=True)
 
-        # Write OpenFOAM-header
-        self.__write_header(U_out_path, "vectorAverageField", "values")
-        self.__write_header(VOFw_out_path, "scalarAverageField", "values")
-
         # write content
         with open(U_out_path, 'a+') as f:
             f.write('//Data points'+'\n')
@@ -223,7 +197,3 @@ class Writer():
             for fid in range(n_faces):
                 f.write(str(alpha[fid,tid,0])+'\n')
             f.write(')'+'\n')
-
-        # Write OpenFOAM-footer
-        self.__write_footer(U_out_path)
-        self.__write_footer(VOFw_out_path)
