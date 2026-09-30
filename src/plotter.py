@@ -1,4 +1,4 @@
-from utils import np, sys, os, plt
+from utils import np, os, plt
 
 class Plotter():
     def __init__(self):

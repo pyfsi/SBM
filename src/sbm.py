@@ -24,6 +24,10 @@ class SBM():
         self.inlet_name = str(config["cfd"]["inlet_name"])
         self.density_gas = float(config["cfd"]["rho_g"])
         self.mg_max = float(config["model"]["mass_g"]["max"])
+
+        self.purge_flag = bool(self.config["settings"]["purge_boundary_data"])
+        self.plotter_flag = bool(self.config["settings"]["activate_plotter"])
+
         self.cwd = os.getcwd()
 
     def check_case(self):
@@ -33,10 +37,9 @@ class SBM():
         self._check_modules()
 
     def purge_boundary_data(self):
-        purge_boundary_data = self.config["settings"]["purge_boundary_data"]
         self.config["_boundary_data_path"] = os.path.join(self.cwd, "constant", "boundaryData")
 
-        if purge_boundary_data:
+        if self.purge_flag:
             if os.path.exists(self.config["_boundary_data_path"]):
                 shutil.rmtree(self.config["_boundary_data_path"])
         else:
@@ -48,7 +51,6 @@ class SBM():
 
         # === initialize sbm components ===
         # diagnostics
-        # self.profiler = Profiler(config)
         self.logger = Logger(self.config)
 
         # inlet data storage
@@ -90,7 +92,8 @@ class SBM():
         self._iterate()
 
         # save plot
-        self.plotter.save_plot()
+        if self.plotter_flag:
+            self.plotter.save_plot()
 
     def finalize(self):
         # attributes
@@ -214,9 +217,10 @@ class SBM():
                 self.writer.run()
 
             # plotter
-            with self.logger.function_call(name="plotter"):
-                samples, rejected_samples = self.inlet_data.get_samples()
-                self.plotter.plot(samples, rejected_samples)
+            if self.plotter_flag:
+                with self.logger.function_call(name="plotter"):
+                    samples, rejected_samples = self.inlet_data.get_samples()
+                    self.plotter.plot(samples, rejected_samples)
 
             # inlet data cleanup
             self.inlet_data.clean_samples()
