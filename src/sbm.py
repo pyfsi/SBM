@@ -225,6 +225,9 @@ class SBM():
             # inlet data cleanup
             self.inlet_data.clean_samples()
 
+        # write last time step
+        self.writer.run_last(block_idx+1)
+
     def _add_time_config(self):
         time_step = self.time_step
         time_block = self.time_block

@@ -44,6 +44,24 @@ class Writer():
         if self.save_csv:
             self._save_csv()
 
+    def run_last(self, block_idx):
+        ''''Write boundary condition for last time step'''
+        # absolute time index and time array
+        abs_time_idx_block_start = self.timesteps_per_block * block_idx
+        abs_time_idx_block_end = self.timesteps_per_block * (block_idx+1)
+        abs_time_idx = np.arange(abs_time_idx_block_start, abs_time_idx_block_end, 1)
+        self.time = abs_time_idx * self.time_step + self.time_start
+        self.block_idx = block_idx
+
+        # set inlet data
+        self.inlet_faces = self.inlet_data.faces[:,:]
+        self.inlet_normal = self.inlet_data.normal[:]
+        self.alpha = np.ones(self.inlet_data.alpha[:,:,:].shape)
+        vel_bc = self.inlet_normal[:] * self.velocity_bc
+        self.velocity = np.ones(self.inlet_data.velocity.shape[:2])[:,:,None] * vel_bc
+
+        self._write_boundary_data()
+
     def check(self):
         '''Check boundary condition definition.'''
         cwd = os.getcwd()
@@ -110,7 +128,6 @@ class Writer():
     # === Protected functions ===
     def _write_boundary_data(self):
         # attributes
-        time_step = self.time_step
         boundary_data_path = self.boundary_data_path
         boundary_inlet_path = os.path.join(boundary_data_path, "inlet")
         alpha_name = self.alpha_name
